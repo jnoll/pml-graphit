@@ -6,10 +6,12 @@ module Main where
 
 import Control.Monad.Reader (runReader)
 import Data.List (intercalate, intersperse)
+import Data.Maybe (fromMaybe)
 import System.IO ( stdin, hGetContents )
 import System.Environment ( getArgs, getProgName )
 import System.Exit ( exitFailure, exitSuccess )
 
+import Formal.PML.Subtree (selectSubtree, PML(..))
 import Formal.PML.PrintUML -- (printUML, Print(..))
 import Formal.PML.LexPML
 import Formal.PML.ParPML
@@ -26,25 +28,40 @@ myLLexer = myLexer
 putStrV :: String -> IO ()
 putStrV s = putStrLn s
 
-runFile :: (Print a, Show a) => Options -> ParseFun a -> FilePath -> IO ()
+runFile :: (Print a, PML a, Show a) => Options -> ParseFun a -> FilePath -> IO ()
 runFile t p f = putStrLn f >> readFile f >>= runContents t p
 
-showTree :: (Show a, Print a) => Options -> a -> IO ()
+showTree :: (Show a, Print a, PML a) => Options -> a -> IO ()
 showTree opt tree = 
-    let color = case opt_color opt of Just c -> (read  $ c :: [(String, String)]) 
-                                      otherwise -> []
-    in putStrLn $ intercalate "\n" $ runReader (printUML tree) defGraphOptions { gopt_graphtype = if (opt_swimlanes opt) then Swimlanes else Partitions
-                                                                               , gopt_color =  color}
+  let color   = case opt_color opt of 
+                  Just c -> (read  $ c :: [(String, String)]) 
+                  otherwise -> []
+      opt' = defGraphOptions { gopt_graphtype = if (opt_swimlanes opt) then Swimlanes else Partitions
+                             , gopt_color =  color}
+  in putStrLn $ intercalate "\n" $
+     case opt_subtree opt of 
+       Just st -> case selectSubtree st tree of
+                    Just st'@(PrimAct  (ID id) _ _)        -> runReader (printUML'' st') opt'
+                    Just st'@(PrimBr   (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
+                    Just st'@(PrimSeln (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
+                    Just st'@(PrimIter (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
+                    Just st'@(PrimSeq  (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
+                    Just st'@(PrimTask (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
+                    Just st'                               -> runReader (printUML'' st') opt'
+                    otherwise -> runReader (printUML tree) opt'
+       otherwise -> runReader (printUML tree) opt'
 
-runContents :: (Print a, Show a) => Options -> ParseFun a -> String -> IO ()
+
+runContents :: (Print a, PML a, Show a) => Options -> ParseFun a -> String -> IO ()
 runContents opt p s = let ts = myLLexer s in case p ts of
-           Bad s    -> do putStrLn "\nParse              Failed...\n"
+           Bad s    -> do putStrLn "\nParse Failed...\n"
                           putStrV  "Tokens:"
                           putStrV  $ show ts
                           putStrLn s
                           exitFailure
-           Ok  tree -> do showTree opt tree
-                          exitSuccess
+           Ok  tree -> do 
+             showTree opt tree
+             exitSuccess
 
 
 
@@ -56,29 +73,20 @@ run opts =
         getContents >>= runContents opts pPROCESS 
 
 
-usage :: IO ()
-usage = do
-  putStrLn $ unlines
-    [ "usage: Call with one of the following argument combinations:"
-    , "  --help          Display this help message."
-    , "  (no arguments)  Parse stdin."
-    , "  (files)         Parse content of files."
-    , "  --swim          Produce swimlanes graph."
-    ]
-  exitFailure
-
 data Options = Options {
       opt_swimlanes :: Bool
-    , opt_select :: Maybe String
     , opt_files :: [String]
     , opt_color :: Maybe String
+    , opt_subtree :: Maybe String
 } deriving (Show, Generic, HasArguments)
 
 main :: IO ()
-main = withCliModified [ AddShortOption "swimlanes" 's'
-                       , RenameOption "opt_swimlanes" "swim"
-                       , AddShortOption "color" 'c' 
+main = withCliModified [ RenameOption "opt_swimlanes" "swim"
+                       , AddShortOption "swim" 's'
                        , RenameOption "opt_color" "color"
+                       , AddShortOption "color" 'c' 
+                       , RenameOption "opt_subtree" "subtree"
+                       , AddShortOption "subtree" 't' 
                        , UseForPositionalArguments "opt_files" "filenames"
                        ] run
 

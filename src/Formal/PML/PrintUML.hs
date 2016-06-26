@@ -43,12 +43,37 @@ swimlane' _ _ = ""
 printSwimlane :: String -> String
 printSwimlane s = "|" ++ s ++ "|"
 
-printUML' :: PROCESS -> (Reader GraphOptions) [String]
-printUML' (Process id ps) = 
-    printPRIMs "\n" ps >>= (\body -> do
-    t <- graphType
-    return $ intersperse "\n" $ ["@startuml", "title " ++ (printID id), swimlane t ps, "start"] ++ body ++ ["end", "@enduml"])
+printPUML :: PRIM -> [PRIM] -> [String] -> (Reader GraphOptions) [String]
+printPUML root children body = do
+  t <- graphType
+  let title = case t of Swimlanes -> printTitle root
+                        otherwise -> ""
+  return $ intersperse "\n" $ ["@startuml", title, swimlane t children, "start"] ++ body ++ ["end", "@enduml"]
 
+printTitle :: PRIM -> String
+printTitle p@(PrimSeq  (OpNmId id) ps) = mkTitle id
+printTitle p@(PrimSeln (OpNmId id) ps) = mkTitle id
+printTitle p@(PrimBr   (OpNmId id) ps) = mkTitle id
+printTitle p@(PrimIter (OpNmId id) ps) = mkTitle id
+printTitle p@(PrimTask (OpNmId id) ps) = mkTitle id
+printTitle p@(PrimAct  id _ _)         = mkTitle id
+
+
+mkTitle :: ID -> String
+mkTitle id = "title //" ++ (printID id) ++ "//"
+
+printUML' :: PROCESS -> (Reader GraphOptions) [String]
+printUML' (Process id ps) = do 
+    printPRIMs "\n" ps >>= printPUML (PrimSeq (OpNmId id) ps) ps
+
+
+printUML'' :: PRIM -> (Reader GraphOptions) [String]
+printUML'' p@(PrimSeq  n ps) = printPRIM p >>= printPUML p ps
+printUML'' p@(PrimSeln n ps) = printPRIM p >>= printPUML p ps
+printUML'' p@(PrimBr   n ps) = printPRIM p >>= printPUML p ps
+printUML'' p@(PrimIter n ps) = printPRIM p >>= printPUML p ps
+printUML'' p@(PrimTask n ps) = printPRIM p >>= printPUML p ps
+printUML'' p@(PrimAct  _ _ _) = printPRIM p >>= printPUML p [p]
 
 
 printPRIMs :: String -> [PRIM] -> (Reader GraphOptions) [String]
@@ -87,10 +112,13 @@ printColor colors name = case lookup name colors of
                            Just c -> "#" ++ c
                            Nothing -> ""
 
+
 printID :: ID ->  String
 printID (ID n) = n
+
 printSTRING :: STRING ->  String
 printSTRING (STRING s) = s
+
 printNUMBER :: NUMBER ->  String
 printNUMBER (NUMBER n) = show n
 
