@@ -5,17 +5,23 @@ import Control.Monad.Reader (Reader(..), ask)
 import Formal.PML.AbsPML
 import Data.Char
 import Data.List (intercalate, intersperse)
+import Text.Pandoc (readMarkdown, writePlain, ReaderOptions(..), WriterOptions(..), def)
+
 
 data GraphType = Partitions | Swimlanes | Agents
 
 data GraphOptions = GOpt {
-      gopt_graphtype :: GraphType
-    , gopt_color :: [(String, String)]
+      gopt_color :: [(String, String)]
+    , gopt_graphtype :: GraphType
+    , gopt_prunedepth :: Int
+    , gopt_textwidth :: Int
 }
 
 defGraphOptions =  GOpt {
                      gopt_graphtype = Partitions
+                   , gopt_prunedepth = 0
                    , gopt_color = [] -- list if ("action-name", "color") pairs.
+                   , gopt_textwidth = 10 -- "fill" column
 }
 
 printUML :: Print a => a -> (Reader GraphOptions) [String]
@@ -32,6 +38,9 @@ instance Print PROCESS where
 graphType :: (Reader GraphOptions) GraphType
 graphType = ask >>= (\gopts -> return $ gopt_graphtype gopts)
 
+pruneDepth :: (Reader GraphOptions) Int
+pruneDepth = ask >>= (\gopts -> return $ gopt_prunedepth gopts)
+
 swimlane :: GraphType -> [PRIM] -> String
 swimlane Swimlanes ps = printSwimlane (head $ findAgentsPRIMs ps) 
 swimlane _ _ = ""
@@ -39,6 +48,7 @@ swimlane _ _ = ""
 swimlane' :: GraphType -> [SPEC] -> String
 swimlane' Swimlanes ss = printSwimlane (head $ findAgentsSPECs ss)
 swimlane' _ _ = ""
+
 
 printSwimlane :: String -> String
 printSwimlane s = "|" ++ s ++ "|"
@@ -62,45 +72,76 @@ printTitle p@(PrimAct  id _ _)         = mkTitle id
 mkTitle :: ID -> String
 mkTitle id = "title //" ++ (printID id) ++ "//"
 
+ustosp :: String -> String
+ustosp = map (\c -> if c == '_' then ' ' else c)
+
+formatString :: Int -> String -> String
+formatString w s =  case readMarkdown def $ ustosp s of
+                    Left e -> "fail"
+                    Right p ->  intercalate "\\n" $ lines $ writePlain def { writerColumns = w } p
+
+
 printUML' :: PROCESS -> (Reader GraphOptions) [String]
 printUML' (Process id ps) = do 
-    printPRIMs "\n" ps >>= printPUML (PrimSeq (OpNmId id) ps) ps
+    printPRIMs 0 "\n" ps >>= printPUML (PrimSeq (OpNmId id) ps) ps
 
 
 printUML'' :: PRIM -> (Reader GraphOptions) [String]
-printUML'' p@(PrimSeq  n ps) = printPRIM p >>= printPUML p ps
-printUML'' p@(PrimSeln n ps) = printPRIM p >>= printPUML p ps
-printUML'' p@(PrimBr   n ps) = printPRIM p >>= printPUML p ps
-printUML'' p@(PrimIter n ps) = printPRIM p >>= printPUML p ps
-printUML'' p@(PrimTask n ps) = printPRIM p >>= printPUML p ps
-printUML'' p@(PrimAct  _ _ _) = printPRIM p >>= printPUML p [p]
+printUML'' p@(PrimSeq  n ps) = printPRIM 0 p >>= printPUML p ps
+printUML'' p@(PrimSeln n ps) = printPRIM 0 p >>= printPUML p ps
+printUML'' p@(PrimBr   n ps) = printPRIM 0 p >>= printPUML p ps
+printUML'' p@(PrimIter n ps) = printPRIM 0 p >>= printPUML p ps
+printUML'' p@(PrimTask n ps) = printPRIM 0 p >>= printPUML p ps
+printUML'' p@(PrimAct  _ _ _) = printPRIM 0 p >>= printPUML p [p]
 
 
-printPRIMs :: String -> [PRIM] -> (Reader GraphOptions) [String]
-printPRIMs  sep ps = mapM (printPRIM) ps >>= (\ss -> return $ intercalate [sep] ss)
+printPRIMs :: Int ->  String -> [PRIM] -> (Reader GraphOptions) [String]
+printPRIMs depth sep ps = mapM (printPRIM depth) ps >>= (\ss -> return $ intercalate [sep] ss)
 
 
-printPRIM :: PRIM -> (Reader GraphOptions) [String]
-printPRIM p@(PrimSeq  n ps) = (printPRIMs "" ps) >>= (\ss -> printPRIM' "\n" "\n" n ss p)
-printPRIM p@(PrimSeln n ps) = (printSelect ps) >>= (\ss -> printPRIM' "if (select?) then"  "endif" n ss p)
-printPRIM p@(PrimBr   n ps) = (printPRIMs "fork again" ps) >>= (\ss -> printPRIM' "fork" "end fork" n ss p)
-printPRIM p@(PrimIter n ps) = (printPRIMs "" ps) >>= (\ss -> printPRIM' "repeat"  "repeat while ()" n ss p)
-printPRIM p@(PrimTask n ps) = (printPRIMs "split again" ps) >>= (\ss -> printPRIM' "split" "end split" n ss p)
-printPRIM p@(PrimAct  n act_t spcs) = ask >>= (\opt -> return $ [(swimlane' (gopt_graphtype opt) spcs) ++ "\n" ++ (printColor (gopt_color opt) (printID n)) ++ ":" ++ (printID n) ++ ";"])
+printPRIM :: Int -> PRIM -> (Reader GraphOptions) [String]
+printPRIM depth p@(PrimSeq  n ps) = (printPRIMs (depth + 1) "" ps) >>= (\ss -> printPRIM' depth "\n" "\n" n ss p)
+printPRIM depth p@(PrimSeln n ps) = (printSelect (depth + 1) ps) >>= (\ss -> printPRIM' depth "if (select?) then"  "endif" n ss p)
+printPRIM depth p@(PrimBr   n ps) = (printPRIMs (depth + 1) "fork again" ps) >>= (\ss -> printPRIM' depth "fork" "end fork" n ss p)
+printPRIM depth p@(PrimIter n ps) = (printPRIMs (depth + 1) "" ps) >>= (\ss -> printPRIM' depth "repeat"  "repeat while ()" n ss p)
+printPRIM depth p@(PrimTask n ps) = (printPRIMs (depth + 1) "split again" ps) >>= (\ss -> printPRIM' depth "split" "end split" n ss p)
+printPRIM depth p@(PrimAct id act_t spcs) = 
+    ask >>= (\opt -> if gopt_prunedepth opt > 0 then
+                         if depth <= gopt_prunedepth opt then 
+                         return $ printAct opt 
+                         else return [":" ++ printID id ++ " pruned at " ++ show depth]
+                     else return $ printAct opt)
+        where printAct opt = [(swimlane' (gopt_graphtype opt) spcs) ++ "\n" ++ (printColor (gopt_color opt) (printID id)) ++ ":" ++ (formatString (gopt_textwidth opt) $ printID id) ++ ";"]
+              
+                
 
-printPRIM' :: String -> String -> OPTNM -> [String] -> PRIM -> (Reader GraphOptions) [String]
-printPRIM' pre post id ss p = graphType >>= (\t -> return $ [swimlane t [p], printPartition t id, pre] ++ ss ++ [swimlane t [p], post, printPartitionEnd t id])
 
-printSelect :: [PRIM] -> (Reader GraphOptions) [String]
-printSelect [] = return []
-printSelect (p:r) | length r == 0 = printPRIM p 
-                    | length r == 1 = sequence [printPRIM p, printSelect r] >>= (\ss -> return $ intercalate ["else"] ss)
-                    | otherwise = sequence [printPRIM p, printSelect r] >>= (\ss -> return $ intercalate ["elseif (select?) then"] ss)
+printPRIM' :: Int -> String -> String -> OPTNM -> [String] -> PRIM -> (Reader GraphOptions) [String]
+printPRIM' depth pre post n ss p = 
+    pruneDepth >>= (\d -> if d > 0 then 
+                              if depth < d then 
+                                  printPRIM'' pre post n ss p
+                              else if depth == d then printPRIM depth (PrimAct (ID (printOPTNM n)) OptNull [])
+                                   else return [":" ++ printOPTNM n ++ " pruned at " ++ show depth]
+                          else printPRIM'' pre post n ss p)
 
-printPartition :: GraphType ->  OPTNM -> String
+printPRIM'' :: String -> String -> OPTNM -> [String] -> PRIM -> (Reader GraphOptions) [String]
+printPRIM'' pre post id ss p = 
+    ask >>= (\opt -> let t = gopt_graphtype opt in 
+                     return $ [swimlane t [p], printPartition opt id, pre] ++ ss ++ [swimlane t [p], post, printPartitionEnd t id])
+
+printSelect :: Int -> [PRIM] -> (Reader GraphOptions) [String]
+printSelect _ [] = return []
+printSelect depth (p:r) 
+  | length r == 0 = printPRIM depth p 
+  | length r == 1 = sequence [printPRIM depth p, printSelect depth r] >>= (\ss -> return $ intercalate ["else"] ss) 
+  | otherwise = sequence [printPRIM depth p, printSelect depth r] >>= (\ss -> return $ intercalate ["elseif (select?) then"] ss) 
+
+printPartition :: GraphOptions ->  OPTNM -> String
 printPartition _ OpNmNull =  ""
-printPartition Swimlanes (OpNmId n) =  ""
-printPartition _ (OpNmId n) =  "partition " ++ (printID n) ++ " {"
+printPartition opt (OpNmId n) = case gopt_graphtype opt of 
+                                  Swimlanes -> ""
+                                  otherwise -> "partition \"" ++ (formatString (gopt_textwidth opt) $ printID n) ++ "\" {"
 
 printPartitionEnd :: GraphType -> OPTNM -> String
 printPartitionEnd _ OpNmNull = ""
@@ -112,6 +153,9 @@ printColor colors name = case lookup name colors of
                            Just c -> "#" ++ c
                            Nothing -> ""
 
+printOPTNM :: OPTNM -> String
+printOPTNM OpNmNull = "(none)"
+printOPTNM (OpNmId id) = printID id
 
 printID :: ID ->  String
 printID (ID n) = n
@@ -164,7 +208,7 @@ printVal (ValNum n) = show n
 -- agent { Doctor && Nurse } -> [Doctor, Nurse]
 -- agent { Dev.experience > 5 || QA } -> [Dev, QA]
 findAgentsPRIMs :: [PRIM] -> [String]
-findAgentsPRIMs [] = []
+findAgentsPRIMs [] = ["(none)"]
 findAgentsPRIMs (p:ps) = (findAgentsPRIM  p) ++ (findAgentsPRIMs  ps)
 
 findAgentsPRIM :: PRIM -> [String]
@@ -178,7 +222,7 @@ findAgentsPRIM (PrimAct  _ _ spcs) = findAgentsSPECs spcs
 
 findAgentsSPECs :: [SPEC] -> [String]
 --findAgentsSPECs  = printAgent
-findAgentsSPECs  [] = []
+findAgentsSPECs  [] = ["(none)"]
 findAgentsSPECs  (s@(SpecAgent _):ss) = (printAgent' s):printAgent ss
 findAgentsSPECs  (_:ss) = printAgent ss
 

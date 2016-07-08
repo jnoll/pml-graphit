@@ -37,5 +37,14 @@ process test_control_flow {
 	    agent { Baz || Foo}
 	}
     }
-
+    sequence Nested_0_has_three_levels_of_children_branch_selection_action {
+	action nested_action_at_level_1 {}
+	branch Nested_Branch_at_level_1 {
+	    selection Nested_Selection_at_level_2 {
+		action nested_action_at_level_3_act {}
+		action nested_action_2_at_level_3_act {}
+	    }
+	    action nested_action_at_level_2 {}
+	}
+    }
 }

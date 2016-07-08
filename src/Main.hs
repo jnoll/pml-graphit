@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -7,9 +8,6 @@ module Main where
 import Control.Monad.Reader (runReader)
 import Data.List (intercalate, intersperse)
 import Data.Maybe (fromMaybe)
-import System.IO ( stdin, hGetContents )
-import System.Environment ( getArgs, getProgName )
-import System.Exit ( exitFailure, exitSuccess )
 
 import Formal.PML.Subtree (selectSubtree, PML(..))
 import Formal.PML.PrintUML -- (printUML, Print(..))
@@ -19,7 +17,12 @@ import Formal.PML.SkelPML
 --import Formal.PML.PrintPML
 import Formal.PML.AbsPML
 import Formal.PML.ErrM
-import WithCli
+
+import System.Console.CmdArgs
+import System.Environment ( getArgs, getProgName )
+import System.Exit ( exitFailure, exitSuccess )
+import System.IO ( stdin, hGetContents )
+
 
 type ParseFun a = [Token] -> Err a
 
@@ -33,14 +36,14 @@ runFile t p f = putStrLn f >> readFile f >>= runContents t p
 
 showTree :: (Show a, Print a, PML a) => Options -> a -> IO ()
 showTree opt tree = 
-  let color   = case opt_color opt of 
-                  Just c -> (read  $ c :: [(String, String)]) 
-                  otherwise -> []
-      opt' = defGraphOptions { gopt_graphtype = if (opt_swimlanes opt) then Swimlanes else Partitions
-                             , gopt_color =  color}
+  let color = opt_color opt 
+      opt'  = defGraphOptions { gopt_graphtype = if (opt_swimlanes opt) then Swimlanes else Partitions
+                              , gopt_color =  color
+                              , gopt_prunedepth = opt_depth opt
+                              , gopt_textwidth = opt_width opt 
+                              }
   in putStrLn $ intercalate "\n" $
-     case opt_subtree opt of 
-       Just st -> case selectSubtree st tree of
+     case selectSubtree (opt_subtree opt) tree of
                     Just st'@(PrimAct  (ID id) _ _)        -> runReader (printUML'' st') opt'
                     Just st'@(PrimBr   (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
                     Just st'@(PrimSeln (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
@@ -49,7 +52,7 @@ showTree opt tree =
                     Just st'@(PrimTask (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
                     Just st'                               -> runReader (printUML'' st') opt'
                     otherwise -> runReader (printUML tree) opt'
-       otherwise -> runReader (printUML tree) opt'
+     
 
 
 runContents :: (Print a, PML a, Show a) => Options -> ParseFun a -> String -> IO ()
@@ -63,8 +66,6 @@ runContents opt p s = let ts = myLLexer s in case p ts of
              showTree opt tree
              exitSuccess
 
-
-
 run :: Options -> IO ()
 run opts = 
     if length (opt_files opts) > 0 then
@@ -75,18 +76,27 @@ run opts =
 
 data Options = Options {
       opt_swimlanes :: Bool
+    , opt_depth :: Int
+    , opt_color :: [(String, String)]
     , opt_files :: [String]
-    , opt_color :: Maybe String
-    , opt_subtree :: Maybe String
-} deriving (Show, Generic, HasArguments)
+    , opt_subtree ::  String
+    , opt_width :: Int
+} deriving (Data, Typeable, Show)
+
+defaultOptions :: Options
+defaultOptions = Options {
+            opt_swimlanes = False &= typ "Boolean"            &= help "plot in swimlanes"                      &= name "swim"
+          , opt_color     = []    &= typ "(PML element, Color)" &= help "named item should have specified color" &= name "color"
+          , opt_depth     = 0     &= typ "Int"                &= help "depth at which to prune subtree"        &= name "depth"
+          , opt_files     = def   &= typFile &= args
+          , opt_subtree   = def   &= typ "subtree"            &= help "select subtree"                         &= name "subtree"
+          , opt_width     = 10    &= typ "Int"                &= help "text width for labels/descriptions"     &= name "width"
+          }
+          &= summary "pml-graphit v0.1, (C) 2016 John Noll"
+          &= program "main"
 
 main :: IO ()
-main = withCliModified [ RenameOption "opt_swimlanes" "swim"
-                       , AddShortOption "swim" 's'
-                       , RenameOption "opt_color" "color"
-                       , AddShortOption "color" 'c' 
-                       , RenameOption "opt_subtree" "subtree"
-                       , AddShortOption "subtree" 't' 
-                       , UseForPositionalArguments "opt_files" "filenames"
-                       ] run
+main = do
+    args <- cmdArgs defaultOptions
+    run args
 
