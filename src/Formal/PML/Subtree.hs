@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
--- convert PML to PlantUML Activity Diagram
+-- select subtree from a PML model
 module Formal.PML.Subtree where
 import Formal.PML.AbsPML
 import Data.Char
@@ -28,9 +28,13 @@ selectSubtreePRIMs root (p:ps) =
       otherwise -> selectSubtreePRIMs root ps
 
 selectSubtreePRIM :: String -> PRIM -> Maybe PRIM
-selectSubtreePRIM root p@(PrimBr   (OpNmId (ID id)) ps)  = if root == id then Just p else selectSubtreePRIMs root ps
-selectSubtreePRIM root p@(PrimSeln (OpNmId (ID id)) ps)  = if root == id then Just p else selectSubtreePRIMs root ps
-selectSubtreePRIM root p@(PrimIter (OpNmId (ID id)) ps)  = if root == id then Just p else selectSubtreePRIMs root ps
-selectSubtreePRIM root p@(PrimSeq  (OpNmId (ID id)) ps)  = if root == id then Just p else selectSubtreePRIMs root ps
-selectSubtreePRIM root p@(PrimTask (OpNmId (ID id)) ps)  = if root == id then Just p else selectSubtreePRIMs root ps
+selectSubtreePRIM root p@(PrimBr   nm ps)  = selectSubtreePRIM' root nm p ps
+selectSubtreePRIM root p@(PrimSeln nm ps)  = selectSubtreePRIM' root nm p ps
+selectSubtreePRIM root p@(PrimIter nm ps)  = selectSubtreePRIM' root nm p ps
+selectSubtreePRIM root p@(PrimSeq  nm ps)  = selectSubtreePRIM' root nm p ps
+selectSubtreePRIM root p@(PrimTask nm ps)  = selectSubtreePRIM' root nm p ps
 selectSubtreePRIM root p@(PrimAct  (ID id) _ _)          = if root == id then Just p else Nothing
+
+selectSubtreePRIM' :: String -> OPTNM -> PRIM -> [PRIM] -> Maybe PRIM
+selectSubtreePRIM' root (OpNmId (ID id)) p ps = if root == id then Just p else selectSubtreePRIMs root ps
+selectSubtreePRIM' root (OpNmNull) _ ps = selectSubtreePRIMs root ps

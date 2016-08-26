@@ -9,10 +9,10 @@ process test_control_flow {
     }
     branch Branch {
 	action b_one {
-	    agent { Foo }
+	    agent { Foo && Bar}
 	}
 	action b_two {
-	    agent { Bar }
+	    agent { Bar && Baz}
 	}
     }
     selection Selection {

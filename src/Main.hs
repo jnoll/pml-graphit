@@ -32,12 +32,12 @@ putStrV :: String -> IO ()
 putStrV s = putStrLn s
 
 runFile :: (Print a, PML a, Show a) => Options -> ParseFun a -> FilePath -> IO ()
-runFile t p f = putStrLn f >> readFile f >>= runContents t p
+runFile t p f = readFile f >>= runContents t p
 
 showTree :: (Show a, Print a, PML a) => Options -> a -> IO ()
 showTree opt tree = 
   let color = opt_color opt 
-      opt'  = defGraphOptions { gopt_graphtype = if (opt_swimlanes opt) then Swimlanes else Partitions
+      opt'  = defGraphOptions { gopt_graphtype = if (opt_agents opt) then Agents else if (opt_swimlanes opt) then Swimlanes else Partitions
                               , gopt_color =  color
                               , gopt_prunedepth = opt_depth opt
                               , gopt_textwidth = opt_width opt 
@@ -75,21 +75,23 @@ run opts =
 
 
 data Options = Options {
-      opt_swimlanes :: Bool
+      opt_agents :: Bool
     , opt_depth :: Int
     , opt_color :: [(String, String)]
     , opt_files :: [String]
     , opt_subtree ::  String
+    , opt_swimlanes :: Bool
     , opt_width :: Int
 } deriving (Data, Typeable, Show)
 
 defaultOptions :: Options
 defaultOptions = Options {
-            opt_swimlanes = False &= typ "Boolean"            &= help "plot in swimlanes"                      &= name "swim"
-          , opt_color     = []    &= typ "(PML element, Color)" &= help "named item should have specified color" &= name "color"
+            opt_agents    = False &= typ "Boolean"            &= help "output list of agents"                  &= name "agents"
+          , opt_color     = []    &= typ "PML-element,Color"  &= help "named item should have specified color (no space after comma)" &= name "color"
           , opt_depth     = 0     &= typ "Int"                &= help "depth at which to prune subtree"        &= name "depth"
           , opt_files     = def   &= typFile &= args
           , opt_subtree   = def   &= typ "subtree"            &= help "select subtree"                         &= name "subtree"
+          , opt_swimlanes = False &= typ "Boolean"            &= help "plot in swimlanes"                      &= name "swim"
           , opt_width     = 10    &= typ "Int"                &= help "text width for labels/descriptions"     &= name "width"
           }
           &= summary "pml-graphit v0.1, (C) 2016 John Noll"

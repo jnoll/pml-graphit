@@ -4,11 +4,12 @@ module Formal.PML.PrintUML where
 import Control.Monad.Reader (Reader(..), ask)
 import Formal.PML.AbsPML
 import Data.Char
-import Data.List (intercalate, intersperse)
+import Data.List (nub, intercalate, intersperse, sort)
 import Text.Pandoc (readMarkdown, writePlain, ReaderOptions(..), WriterOptions(..), def)
 
 
-data GraphType = Partitions | Swimlanes | Agents
+data GraphType = Partitions | Swimlanes | Agents 
+  deriving (Eq, Show)
 
 data GraphOptions = GOpt {
       gopt_color :: [(String, String)]
@@ -24,6 +25,7 @@ defGraphOptions =  GOpt {
                    , gopt_textwidth = 10 -- "fill" column
 }
 
+-- Entry point.
 printUML :: Print a => a -> (Reader GraphOptions) [String]
 printUML = prt 
 
@@ -41,14 +43,19 @@ graphType = ask >>= (\gopts -> return $ gopt_graphtype gopts)
 pruneDepth :: (Reader GraphOptions) Int
 pruneDepth = ask >>= (\gopts -> return $ gopt_prunedepth gopts)
 
-swimlane :: GraphType -> [PRIM] -> String
-swimlane Swimlanes ps = printSwimlane (head $ findAgentsPRIMs ps) 
-swimlane _ _ = ""
+-- Print all swimlanes
+swimlanesPRIMs :: GraphType -> [PRIM] -> [String]
+swimlanesPRIMs Swimlanes ps = map printSwimlane $ nub $ findAgentsPRIMs ps
+swimlanesPRIMs _ _ = [""]
 
-swimlane' :: GraphType -> [SPEC] -> String
-swimlane' Swimlanes ss = printSwimlane (head $ findAgentsSPECs ss)
-swimlane' _ _ = ""
+-- This is necessary to get the control flow construct in the right swimlane.
+swimlanePRIMs :: GraphType -> [PRIM] -> String
+swimlanePRIMs Swimlanes ps = printSwimlane (head $ findAgentsPRIMs ps) 
+swimlanePRIMs _ _ = ""
 
+swimlaneSPECs :: GraphType -> [SPEC] -> String
+swimlaneSPECs Swimlanes ss = printSwimlane (head $ findAgentsSPECs ss)
+swimlaneSPECs _ _ = ""
 
 printSwimlane :: String -> String
 printSwimlane s = "|" ++ s ++ "|"
@@ -56,9 +63,12 @@ printSwimlane s = "|" ++ s ++ "|"
 printPUML :: PRIM -> [PRIM] -> [String] -> (Reader GraphOptions) [String]
 printPUML root children body = do
   t <- graphType
-  let title = case t of Swimlanes -> printTitle root
-                        otherwise -> ""
-  return $ intersperse "\n" $ ["@startuml", title, swimlane t children, "start"] ++ body ++ ["end", "@enduml"]
+  case t of Agents -> return $ sort $ nub $ findAgentsPRIMs children
+            otherwise -> return $ intersperse "\n" $ 
+                               ["@startuml", printTitle root] 
+                               ++ (sort $ swimlanesPRIMs t children) -- print ALL swimlanes at top so we see all agents
+                               ++ ["start"] ++ body ++ ["end", "@enduml"]
+
 
 printTitle :: PRIM -> String
 printTitle p@(PrimSeq  (OpNmId id) ps) = mkTitle id
@@ -70,19 +80,23 @@ printTitle p@(PrimAct  id _ _)         = mkTitle id
 
 
 mkTitle :: ID -> String
-mkTitle id = "title //" ++ (printID id) ++ "//"
+mkTitle id = "title //" ++ (ustosp $ printID id) ++ "//"
 
 ustosp :: String -> String
 ustosp = map (\c -> if c == '_' then ' ' else c)
 
 formatString :: Int -> String -> String
-formatString w s =  case readMarkdown def $ ustosp s of
+formatString w s =  intercalate "\\n" $ lines $ formatString' w s
+
+formatString' :: Int -> String -> String
+formatString' w s =  case readMarkdown def $ ustosp s of
                     Left e -> "fail"
-                    Right p ->  intercalate "\\n" $ lines $ writePlain def { writerColumns = w } p
+                    Right p -> writePlain def { writerColumns = w } p
 
 
+-- Real start.
 printUML' :: PROCESS -> (Reader GraphOptions) [String]
-printUML' (Process id ps) = do 
+printUML' (Process id ps) = 
     printPRIMs 0 "\n" ps >>= printPUML (PrimSeq (OpNmId id) ps) ps
 
 
@@ -108,27 +122,54 @@ printPRIM depth p@(PrimTask n ps) = (printPRIMs (depth + 1) "split again" ps) >>
 printPRIM depth p@(PrimAct id act_t spcs) = 
     ask >>= (\opt -> if gopt_prunedepth opt > 0 then
                          if depth <= gopt_prunedepth opt then 
-                         return $ printAct opt 
-                         else return [":" ++ printID id ++ " pruned at " ++ show depth]
-                     else return $ printAct opt)
-        where printAct opt = [(swimlane' (gopt_graphtype opt) spcs) ++ "\n" ++ (printColor (gopt_color opt) (printID id)) ++ ":" ++ (formatString (gopt_textwidth opt) $ printID id) ++ ";"]
-              
-                
+                         return $ printAct opt id spcs ";"
+                         else return [""]
+                     else return $ printAct opt id spcs ";")
 
+printAct :: GraphOptions -> ID -> [SPEC] -> String -> [String]
+printAct opt id spcs term = if (gopt_graphtype opt) == Swimlanes then printActSwimlane (gopt_color opt) (gopt_textwidth opt) id spcs term
+                            else printActPlain (gopt_color opt) (gopt_textwidth opt) id spcs term
+
+printActPlain :: [(String, String)] -> Int -> ID -> [SPEC] -> String -> [String]
+printActPlain c w id spcs term = [(printColor c (printID id)) ++  printActName w id term]
+              
+printActSwimlane :: [(String, String)] -> Int -> ID -> [SPEC] -> String -> [String]
+printActSwimlane c w id spcs term =
+    let as = findAgentsSPECs spcs
+        a = if length as > 0 then head as else "(none)"
+    in if length as > 1         -- add a UML note with other agent names.
+       then [printSwimlane a, (printColor c $ printID id) ++ printActName w id term, "note", 
+--                               formatString' w  ("also involved: " ++ (intercalate " " $ printActSwimlane' w id $ tail as)), 
+                               formatString' w  ("also involved: " ++ (intercalate ", " $ tail as)), 
+                               "end note"
+            ]
+       else [printSwimlane a, (printColor c $ printID id) ++ printActName w id term]
+
+
+-- Recursively print actions in swimlanes for each agent.
+printActSwimlane' :: Int -> ID -> [String] -> [String]
+printActSwimlane' _ _ [] = [""]
+printActSwimlane' w id (a:as) = [a ++ ", "] ++ printActSwimlane' w id as
+
+printActName :: Int -> ID -> String -> String
+printActName w id term = ":" ++ (formatString w $ printID id) ++ term
+
+printPseudoAct :: GraphOptions -> OPTNM -> [String]
+printPseudoAct opt n = printAct opt (ID $ printOPTNM n) [] "|"
 
 printPRIM' :: Int -> String -> String -> OPTNM -> [String] -> PRIM -> (Reader GraphOptions) [String]
 printPRIM' depth pre post n ss p = 
     pruneDepth >>= (\d -> if d > 0 then 
                               if depth < d then 
                                   printPRIM'' pre post n ss p
-                              else if depth == d then printPRIM depth (PrimAct (ID (printOPTNM n)) OptNull [])
-                                   else return [":" ++ printOPTNM n ++ " pruned at " ++ show depth]
+                              else if depth == d then ask >>= (\opt -> return $ printPseudoAct opt n)
+                                   else return [""]
                           else printPRIM'' pre post n ss p)
 
 printPRIM'' :: String -> String -> OPTNM -> [String] -> PRIM -> (Reader GraphOptions) [String]
 printPRIM'' pre post id ss p = 
     ask >>= (\opt -> let t = gopt_graphtype opt in 
-                     return $ [swimlane t [p], printPartition opt id, pre] ++ ss ++ [swimlane t [p], post, printPartitionEnd t id])
+                     return $ [swimlanePRIMs t [p], printPartition opt id, pre] ++ ss ++ [swimlanePRIMs t [p], post, printPartitionEnd t id])
 
 printSelect :: Int -> [PRIM] -> (Reader GraphOptions) [String]
 printSelect _ [] = return []
@@ -168,31 +209,31 @@ printNUMBER (NUMBER n) = show n
 
 printAgent :: [SPEC] -> [String]
 printAgent [] = []
-printAgent (s@(SpecAgent e):ss) = (printAgent' s):printAgent ss 
+printAgent (s@(SpecAgent e):ss) = printAgent' s ++ printAgent ss 
 printAgent (_:ss) = printAgent ss 
 
-printAgent' :: SPEC -> String
+printAgent' :: SPEC -> [String]
 printAgent' (SpecAgent e) = printName e
-printAgent' _ = "none"
+printAgent' _ = ["none"]
 
 -- XXXjn this assumes only want first name; suitable for swimlanes
 -- based on agent name, but not much else.
-printName :: EXPR -> String
-printName (DisjExpr l _) = (printName l) -- only print first agent
-printName (ConjExpr l _) = (printName l) -- only print first agent
-printName (Str s) = printSTRING s
-printName (RelEq l _) = printVal l
-printName (RelNe l _) = printVal l
-printName (RelLt l _) = printVal l
-printName (RelGt l _) = printVal l
-printName (RelLe l _) = printVal l
-printName (RelGe l _) = printVal l
-printName (RelVeq l _) = printVar l
-printName (RelVne l _) = printVar l
+printName :: EXPR -> [String]
+printName (DisjExpr l r) = (printName l) ++ (printName r) -- only print first agent
+printName (ConjExpr l r) = (printName l) ++ (printName r) -- only print first agent
+printName (Str s)        = [printSTRING s]
+printName (RelEq l _)    = [printVal l]
+printName (RelNe l _)    = [printVal l]
+printName (RelLt l _)    = [printVal l]
+printName (RelGt l _)    = [printVal l]
+printName (RelLe l _)    = [printVal l]
+printName (RelGe l _)    = [printVal l]
+printName (RelVeq l _)   = [printVar l]
+printName (RelVne l _)   = [printVar l]
 
-printName (PrimVar v) = printVar v
-printName (PrimAttr _) = ""
-printName (PrimNot _) = ""
+printName (PrimVar v) = [printVar v]
+printName (PrimAttr _) = [""]
+printName (PrimNot _) = [""]
 
 printVar :: VAREXPR -> String
 printVar (VarId i) = printID i
@@ -208,7 +249,7 @@ printVal (ValNum n) = show n
 -- agent { Doctor && Nurse } -> [Doctor, Nurse]
 -- agent { Dev.experience > 5 || QA } -> [Dev, QA]
 findAgentsPRIMs :: [PRIM] -> [String]
-findAgentsPRIMs [] = ["(none)"]
+findAgentsPRIMs [] = []
 findAgentsPRIMs (p:ps) = (findAgentsPRIM  p) ++ (findAgentsPRIMs  ps)
 
 findAgentsPRIM :: PRIM -> [String]
@@ -222,7 +263,7 @@ findAgentsPRIM (PrimAct  _ _ spcs) = findAgentsSPECs spcs
 
 findAgentsSPECs :: [SPEC] -> [String]
 --findAgentsSPECs  = printAgent
-findAgentsSPECs  [] = ["(none)"]
-findAgentsSPECs  (s@(SpecAgent _):ss) = (printAgent' s):printAgent ss
+findAgentsSPECs  [] = []
+findAgentsSPECs  (s@(SpecAgent _):ss) = (printAgent' s) ++ printAgent ss
 findAgentsSPECs  (_:ss) = printAgent ss
 
