@@ -31,8 +31,6 @@ myLLexer = myLexer
 putStrV :: String -> IO ()
 putStrV s = putStrLn s
 
-runFile :: (Print a, PML a, Show a) => Options -> ParseFun a -> FilePath -> IO ()
-runFile t p f = readFile f >>= runContents t p
 
 showTree :: (Show a, Print a, PML a) => Options -> a -> IO ()
 showTree opt tree = 
@@ -42,16 +40,16 @@ showTree opt tree =
                               , gopt_prunedepth = opt_depth opt
                               , gopt_textwidth = opt_width opt 
                               }
-  in putStrLn $ intercalate "\n" $
-     case selectSubtree (opt_subtree opt) tree of
-                    Just st'@(PrimAct  (ID id) _ _)        -> runReader (printUML'' st') opt'
-                    Just st'@(PrimBr   (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
-                    Just st'@(PrimSeln (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
-                    Just st'@(PrimIter (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
-                    Just st'@(PrimSeq  (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
-                    Just st'@(PrimTask (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
-                    Just st'                               -> runReader (printUML'' st') opt'
-                    otherwise -> runReader (printUML tree) opt'
+  in putStrLn $ intercalate "\n" $ runReader (printUML tree) opt'
+--     case selectSubtree (opt_subtree opt) tree of
+--                    Just st'@(PrimAct  (ID id) _ _)        -> runReader (printUML'' st') opt'
+--                    Just st'@(PrimBr   (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
+--                    Just st'@(PrimSeln (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
+--                    Just st'@(PrimIter (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
+--                    Just st'@(PrimSeq  (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
+--                    Just st'@(PrimTask (OpNmId (ID id)) _) -> runReader (printUML'' st') opt'
+--                    Just st'                               -> runReader (printUML'' st') opt'
+--                    otherwise -> runReader (printUML tree) opt'
      
 
 
@@ -65,6 +63,9 @@ runContents opt p s = let ts = myLLexer s in case p ts of
            Ok  tree -> do 
              showTree opt tree
              exitSuccess
+
+runFile :: (Print a, PML a, Show a) => Options -> ParseFun a -> FilePath -> IO ()
+runFile t p f = readFile f >>= runContents t p
 
 run :: Options -> IO ()
 run opts = 
