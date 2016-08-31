@@ -2,14 +2,20 @@ process test_control_flow {
     iteration Iteration {
 	action i_one {
 	    agent { Foo }
+	    requires { r1 }
+	    provides { r2 }
 	}
 	action i_two {
 	    agent { Bar }
+	    requires { r2 }
+	    provides { r3 }
 	}
     }
     branch Branch {
 	action b_one {
 	    agent { Foo && Bar}
+	    requires { r3 && r4 }
+	    provides { r5 && r4 }
 	}
 	action b_two {
 	    agent { Bar && Baz}

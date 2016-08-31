@@ -1,14 +1,14 @@
 process swimlanes {
-    action a_foo_bar_baz {
+    action a_foo_bar_or_baz {
 	agent { Foo && Bar || Baz }
     }
-    action a_foo {
+    action a_foo_bar {
 	agent { Foo && Bar}
     }
-    action a_bar {
+    action a_foo_baz {
 	agent { Foo && Baz }
     }
-    action a_baz {
+    action a_foo_baz_baz {
 	agent { Foo && Bar && Baz }
     }
 }

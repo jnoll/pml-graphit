@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 -- convert PML to PlantUML Activity Diagram
-module Formal.PML.PrintUML where
+module Formal.PML.PrintUML (GraphType(..), GraphOptions(..), defGraphOptions, printUMLProcess, printUMLPRIM) where
 import Formal.PML.PrintBasic 
 import Control.Monad.Reader (Reader(..), ask)
 import Formal.PML.AbsPML
@@ -32,26 +32,18 @@ optGraphType = ask >>= (\gopts -> return $ gopt_graphtype gopts)
 optPruneDepth :: (Reader GraphOptions) Int
 optPruneDepth = ask >>= (\gopts -> return $ gopt_prunedepth gopts)
 
--- Entry point.
-printUML :: Print a => a -> (Reader GraphOptions) [String]
-printUML = prt 
+-- Entry points.
+printUMLProcess :: PROCESS -> (Reader GraphOptions) [String]
+printUMLProcess (Process id ps) = printPRIMs 0 "\n" ps >>= printPUML (PrimSeq (OpNmId id) ps) ps
 
-class Print a where
-    prt :: a -> (Reader GraphOptions) [String]
-
-instance Print PROCESS where
-    prt p = case p of (Process id ps) -> printPRIMs 0 "\n" ps >>= printPUML (PrimSeq (OpNmId id) ps) ps
-
-instance Print PRIM where
-    prt p = case p of 
-              p@(PrimSeq  n ps)  -> printPRIM 0 p >>= printPUML p ps
-              p@(PrimSeln n ps)  -> printPRIM 0 p >>= printPUML p ps
-              p@(PrimBr   n ps)  -> printPRIM 0 p >>= printPUML p ps
-              p@(PrimIter n ps)  -> printPRIM 0 p >>= printPUML p ps
-              p@(PrimTask n ps)  -> printPRIM 0 p >>= printPUML p ps
-              p@(PrimAct  _ _ _) -> printPRIM 0 p >>= printPUML p [p]
-
-
+printUMLPRIM :: PRIM  -> (Reader GraphOptions) [String]
+printUMLPRIM p = case p of 
+                   p@(PrimSeq  n ps)  -> printPRIM 0 p >>= printPUML p ps
+                   p@(PrimSeln n ps)  -> printPRIM 0 p >>= printPUML p ps
+                   p@(PrimBr   n ps)  -> printPRIM 0 p >>= printPUML p ps
+                   p@(PrimIter n ps)  -> printPRIM 0 p >>= printPUML p ps
+                   p@(PrimTask n ps)  -> printPRIM 0 p >>= printPUML p ps
+                   p@(PrimAct  _ _ _) -> printPRIM 0 p >>= printPUML p [p]
 
 printPUML :: PRIM -> [PRIM] -> [String] -> (Reader GraphOptions) [String]
 printPUML root children body = do
