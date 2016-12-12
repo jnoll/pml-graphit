@@ -1,32 +1,53 @@
 {- Print basic elements from PML, as simple strings without formatting
 that can be used by output-specific print modules.-} 
 
-module Formal.PML.PrintBasic (findAgentsPRIMs, findAgentsSPECs, findRequiresPRIMs, findProvidesPRIMs, printID, printOPTNM) where 
+module Formal.PML.PrintBasic (findActionsPRIMs, findAgentsPRIMs, findFirstAgentsPRIMs, findAgentsSPECs, findRequiresPRIMs, findRequiresSPECs, findProvidesPRIMs, findProvidesSPECs, printID, printTitle, printOPTNM, printScript) where 
 import Control.Monad.Reader (Reader(..), ask)
 import Data.List (intercalate, intersperse, nub, sort)
 import Formal.PML.AbsPML
+
+findActionsPRIMs :: [PRIM] -> [(String, String, String, [String])]
+findActionsPRIMs [] = []
+findActionsPRIMs (p:ps) = (findActionsPRIM  p) ++ (findActionsPRIMs  ps)
+
+findActionsPRIM :: PRIM -> [(String, String, String, [String])]
+findActionsPRIM (PrimSeq  _ ps) = findActionsPRIMs ps
+findActionsPRIM (PrimSeln _ ps) = findActionsPRIMs ps
+findActionsPRIM (PrimBr   _ ps) = findActionsPRIMs ps
+findActionsPRIM (PrimIter _ ps) = findActionsPRIMs ps
+findActionsPRIM (PrimTask _ ps) = findActionsPRIMs ps
+findActionsPRIM (PrimAct  id t spcs) = [(printID id, printOPTYP t, printScript spcs, findAgentsSPECs spcs)]
+
+
 
 -- Get agent name(s) from expression in 'agent' field: 
 -- agent { Doctor && Nurse } -> [Doctor, Nurse]
 -- agent { Dev.experience > 5 || QA } -> [Dev, QA]
 findAgentsPRIMs :: [PRIM] -> [String]
-findAgentsPRIMs [] = []
-findAgentsPRIMs (p:ps) = (findAgentsPRIM  p) ++ (findAgentsPRIMs  ps)
+findAgentsPRIMs = findAgentsPRIMs' False
 
-findAgentsPRIM :: PRIM -> [String]
-findAgentsPRIM (PrimSeq  _ ps) = findAgentsPRIMs ps
-findAgentsPRIM (PrimSeln _ ps) = findAgentsPRIMs ps
-findAgentsPRIM (PrimBr   _ ps) = findAgentsPRIMs ps
-findAgentsPRIM (PrimIter _ ps) = findAgentsPRIMs ps
-findAgentsPRIM (PrimTask _ ps) = findAgentsPRIMs ps
-findAgentsPRIM (PrimAct  _ _ spcs) = findAgentsSPECs spcs
+findFirstAgentsPRIMs :: [PRIM] -> [String]
+findFirstAgentsPRIMs = findAgentsPRIMs' True 
 
+findAgentsPRIMs' :: Bool -> [PRIM] -> [String]
+findAgentsPRIMs' _ [] = []
+findAgentsPRIMs' firstOnly (p:ps) = (findAgentsPRIM firstOnly  p) ++ (findAgentsPRIMs' firstOnly ps)
+
+findAgentsPRIM :: Bool -> PRIM -> [String]
+findAgentsPRIM firstOnly (PrimSeq  _ ps) = findAgentsPRIMs' firstOnly  ps
+findAgentsPRIM firstOnly (PrimSeln _ ps) = findAgentsPRIMs' firstOnly  ps
+findAgentsPRIM firstOnly (PrimBr   _ ps) = findAgentsPRIMs' firstOnly  ps
+findAgentsPRIM firstOnly (PrimIter _ ps) = findAgentsPRIMs' firstOnly  ps
+findAgentsPRIM firstOnly (PrimTask _ ps) = findAgentsPRIMs' firstOnly  ps
+findAgentsPRIM firstOnly (PrimAct  _ _ spcs) = findAgentsSPECs' firstOnly spcs 
 
 findAgentsSPECs :: [SPEC] -> [String]
---findAgentsSPECs  = printAgent
-findAgentsSPECs  [] = []
-findAgentsSPECs  (s@(SpecAgent _):ss) = (printAgent' s) ++ printAgent ss
-findAgentsSPECs  (_:ss) = printAgent ss
+findAgentsSPECs = findAgentsSPECs' False
+
+findAgentsSPECs' :: Bool -> [SPEC] -> [String]
+findAgentsSPECs' _ [] = []
+findAgentsSPECs' firstOnly  (s@(SpecAgent _):ss) = if firstOnly then [head $ printAgent' s]  else (printAgent' s) ++ findAgentsSPECs' firstOnly ss
+findAgentsSPECs' firstOnly (_:ss) = findAgentsSPECs' firstOnly ss
 
 -- Get resource name(s) from expression in 'resource' field. 
 findRequiresPRIMs :: [PRIM] -> [String]
@@ -71,8 +92,22 @@ printOPTNM :: OPTNM -> String
 printOPTNM OpNmNull = "(none)"
 printOPTNM (OpNmId id) = printID id
 
+-- XXX Does this really belong here?
+printTitle :: PRIM -> String
+printTitle p@(PrimSeq  (OpNmId id) ps) = printID id
+printTitle p@(PrimSeln (OpNmId id) ps) = printID id
+printTitle p@(PrimBr   (OpNmId id) ps) = printID id
+printTitle p@(PrimIter (OpNmId id) ps) = printID id
+printTitle p@(PrimTask (OpNmId id) ps) = printID id
+printTitle p@(PrimAct  id _ _)         = printID id
+
 printID :: ID ->  String
 printID (ID n) = n
+
+printOPTYP :: OPTYP -> String
+printOPTYP OptNull = "manual"
+printOPTYP OptMan = "manual"
+printOPTYP OptExec = "automatic"
 
 printSTRING :: STRING ->  String
 printSTRING (STRING s) = s
@@ -100,11 +135,17 @@ printResource' (SpecReqs e) = printName e
 printResource' (SpecProv e) = printName e
 printResource' _ = ["none"]
 
+printScript :: [SPEC] -> String
+printScript [] = []
+printScript ((SpecScript (STRING s)):ss) = init $ tail s
+printScript (_:ss) = printScript ss 
+
+
 -- XXXjn this assumes only want first name; suitable for swimlanes
 -- based on agent name, but not much else.
 printName :: EXPR -> [String]
-printName (DisjExpr l r) = (printName l) ++ (printName r) -- only print first agent
-printName (ConjExpr l r) = (printName l) ++ (printName r) -- only print first agent
+printName (DisjExpr l r) = (printName l) ++ (printName r)
+printName (ConjExpr l r) = (printName l) ++ (printName r)
 printName (Str s)        = [printSTRING s]
 printName (RelEq l _)    = [printVal l]
 printName (RelNe l _)    = [printVal l]

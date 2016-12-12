@@ -8,10 +8,12 @@ module Main where
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
 
+import Formal.PML.AbsPML (PROCESS(..))
 import Formal.PML.ErrM
-import Formal.PML.Subtree (selectSubtree, PML(..))
-import Formal.PML.PrintPML (Print(..), parseContents)
-import Formal.PML.PrintUML (GraphOptions(..), GraphType(..), defGraphOptions)
+import Formal.PML.Subtree (selectSubtree)
+import Formal.PML.Print 
+import Formal.PML.GraphOptions (GraphType(..), GraphOptions(..), defGraphOptions)
+--import Formal.PML.PrintUML (GraphOptions(..), GraphType(..), defGraphOptions)
 
 import System.Console.CmdArgs
 import System.Environment (getArgs, getProgName)
@@ -25,41 +27,46 @@ data Options = Options {
       opt_agents :: Bool
     , opt_requires :: Bool
     , opt_provides :: Bool
+    , opt_dot :: Bool
     , opt_depth :: Int
+    , opt_expand :: String
     , opt_color :: [(String, String)]
     , opt_files :: [String]
     , opt_subtree ::  String
     , opt_swimlanes :: Bool
     , opt_width :: Int
+    , opt_words :: Int
 } deriving (Data, Typeable, Show)
 
-printPML :: Print a => Options -> a -> [String]
-printPML opts a = if opt_agents opts then prtAgents a
-                  else if opt_requires opts then prtRequires a
-                  else if opt_provides opts then prtProvides a
+printPML' :: Options -> PROCESS -> [String]
+printPML' opts p = 
+    let gopts = if opt_agents opts then defGraphOptions { gopt_graphtype = Agents }
+                  else if opt_requires opts then defGraphOptions { gopt_graphtype = Requires }
+                  else if opt_provides opts then defGraphOptions { gopt_graphtype = Provides }
+                  else if opt_dot opts then defGraphOptions { gopt_graphtype = Dataflow } 
                   else let color = opt_color opts 
-                           opt'  = defGraphOptions { gopt_graphtype = if (opt_swimlanes opts) then Swimlanes else Partitions
-                                                   , gopt_color =  color
-                                                   , gopt_prunedepth = opt_depth opts
-                                                   , gopt_textwidth = opt_width opts 
-                                                   }
-                       in prtUML opt' a
+                       in defGraphOptions { gopt_graphtype = if (opt_swimlanes opts) then Swimlanes else Partitions
+                                          , gopt_color = color
+                                          , gopt_prunedepth = opt_depth opts
+                                          , gopt_expand = opt_expand opts
+                                          , gopt_textwidth = opt_width opts 
+                                          , gopt_scriptwords = opt_words opts 
+                                          }
+    in printPML gopts p
 
 
 
 
 -- Print a process- or sub-tree.
-showTree :: (Show a, Print a) => Options -> a -> IO ()
-showTree opts tree = putStrLn $ intercalate "\n" $ printPML opts tree
+showTree :: Options -> PROCESS -> IO ()
+showTree opts tree = putStrLn $ intercalate "\n" $ printPML' opts tree
 
 
 runContents :: Options -> String -> IO ()
 runContents opt s = case parseContents s of
            Bad s    -> do putStrLn $ "error: " ++ s
 
-           Ok  tree -> do case selectSubtree (opt_subtree opt) tree of 
-                            Just st   -> showTree opt st
-                            otherwise -> showTree opt tree
+           Ok  tree -> showTree opt $ selectSubtree (opt_subtree opt) tree 
 
 
 runFile :: Options -> FilePath -> IO ()
@@ -79,12 +86,15 @@ defaultOptions = Options {
             opt_agents    = False &= typ "Boolean"            &= help "output list of agents"                  &= name "agents"
           , opt_requires  = False &= typ "Boolean"            &= help "output list of required resources"      &= name "requires"
           , opt_provides  = False &= typ "Boolean"            &= help "output list of provided resources"      &= name "provides"
+          , opt_dot       = False &= typ "Boolean"            &= help "output dot (graphviz) digraph"          &= name "dot"
           , opt_color     = []    &= typ "PML-element,Color"  &= help "named item should have specified color (no space after comma)" &= name "color"
           , opt_depth     = 0     &= typ "Int"                &= help "depth at which to prune subtree"        &= name "depth"
+          , opt_expand    = []    &= typ "Name"               &= help "expand this action beyond prune depth"  &= name "expand"
           , opt_files     = def   &= typFile &= args
           , opt_subtree   = def   &= typ "subtree"            &= help "select subtree"                         &= name "subtree"
           , opt_swimlanes = False &= typ "Boolean"            &= help "plot in swimlanes"                      &= name "swim"
           , opt_width     = 10    &= typ "Int"                &= help "text width for labels/descriptions"     &= name "width"
+          , opt_words     = 10    &= typ "Int"                &= help "number of words for descriptions"       &= name "Words"
           }
           &= summary "pml-graphit v0.1, (C) 2016 John Noll"
           &= program "main"

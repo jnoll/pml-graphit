@@ -12,6 +12,27 @@ category:            Web
 build-type:          Simple
 cabal-version:       >=1.10
 
+library
+  build-tools:   ghc >= 7.0
+
+  default-language:
+                   Haskell2010
+  hs-source-dirs:  src
+
+  exposed-modules: Formal.PML.GraphOptions
+                 , Formal.PML.Print
+                 , Formal.PML.PrintBasic
+                 , Formal.PML.PrintDot
+                 , Formal.PML.PrintUML
+                 , Formal.PML.Subtree
+
+  build-depends:       base >= 4.7 && < 5
+                     , array
+                     , mtl
+                     , pandoc
+                     , pml-bnfc
+
+
 executable pml-graphit
   hs-source-dirs:      src
   main-is:             Main.hs
@@ -22,3 +43,9 @@ executable pml-graphit
                      , mtl
                      , pandoc
                      , pml-bnfc
+  other-modules: Formal.PML.GraphOptions
+    , Formal.PML.Print
+    , Formal.PML.PrintBasic
+    , Formal.PML.PrintDot
+    , Formal.PML.PrintUML
+    , Formal.PML.Subtree
