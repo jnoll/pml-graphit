@@ -8,6 +8,7 @@ import Formal.PML.AbsPML
 import Data.Char
 import Data.List (drop, find, group, intercalate, intersperse, nub, sort, sortBy, take, isPrefixOf)
 import Text.Pandoc (readMarkdown, writePlain, ReaderOptions(..), WriterOptions(..), def)
+import Text.Pandoc.Shared (trim) -- overkill, but Pandoc is included anyway
 
 -- Entry points.
 printPUML :: PRIM -> [PRIM] -> [String] -> (Reader GraphOptions) String
@@ -118,11 +119,9 @@ printActSwimlane c w wds id spcs term =
     let as = findAgentsSPECs spcs
         a = if length as > 0 then head as else "(none)"
     in if length as > 1         -- add a UML note with other agent names.
-       then [printSwimlane a, (printColor c $ printID id) ++ printActName w wds id (printScript spcs) term , "note", 
-                               formatString' w  ("also involved: " ++ (intercalate ", " $ tail as)), 
-                               "end note"
-            ]
-       else [printSwimlane a, (printColor c $ printID id) ++ printActName w wds id (printScript spcs) term ]
+       then [printSwimlane a, (printColor c $ printID id) ++ printActName w wds id (printScript spcs) "", "==agents==", 
+                               formatString' w  (intercalate ", " $ map trim as), term]
+       else [printSwimlane a, (printColor c $ printID id) ++ printActName w wds id (printScript spcs) "", "==agent==", a, term]
 
 
 -- Recursively print actions in swimlanes for each agent.
@@ -131,7 +130,8 @@ printActSwimlane' _ _ [] = [""]
 printActSwimlane' w id (a:as) = [a ++ ", "] ++ printActSwimlane' w id as
 
 printActName :: Int -> Int -> ID -> String -> String -> String
-printActName w wds id script term = ":" ++ (formatString w $ printID id ++ (if wds > 0 then " - " ++ (unwords $ take wds $ words $ script) else "") ) ++ term
+--printActName w wds id script term = ":" ++ (formatString w $ printID id ++ (if wds > 0 then " - " ++ (unwords $ take wds $ words $ script) else "") ) ++ term
+printActName w wds id script term = ":" ++ (formatString' w $ printID id ++ (if wds > 0 then " - " ++ (unwords $ take wds $ words $ script) else "") ) ++ term
 
 printPseudoAct :: GraphOptions -> OPTNM -> [String]
 printPseudoAct opt n = printAct opt (ID $ printOPTNM n) [] ";"
