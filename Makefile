@@ -19,8 +19,8 @@ test-happyswim:
 	@eog test.png
 test-swim:
 	@echo "swimlanes2: Foo: 4, Bar noted: 3, Baz noted: 3"
-	@stack exec pml-graphit -- --swim test_swimlanes2.pml > test.puml
-	@plantuml test.puml
+	stack exec pml-graphit -- --swim test_swimlanes2.pml > test.puml
+	plantuml test.puml
 	@eog test.png
 test-swim2:
 	@echo "swimlanes3: Foo: 1"
@@ -37,6 +37,12 @@ test-swim-subtree:
 	@stack exec pml-graphit -- --subtree Iteration --swim test_control_flow.pml > test.puml
 	@plantuml test.puml
 	@eog test.png
+test-swim-ordered:
+	@echo "ordered swimlanes: Foo: 2, Bar: 1, Baz: 1, in that order"
+	@stack exec pml-graphit -- --swim --headings Foo --headings Bar --headings Baz  test_swimlanes.pml > test.puml
+	@plantuml test.puml
+	@eog test.png
+
 test-textwidth:
 	@echo "test_control_flow.pml + textwidth = 20"
 	@stack exec pml-graphit -- --width 20 test_control_flow.pml > test.puml

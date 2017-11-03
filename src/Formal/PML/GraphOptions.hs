@@ -10,8 +10,9 @@ data GraphOptions = GOpt {
     , gopt_graphtype :: GraphType
     , gopt_prunedepth :: Int
     , gopt_expand :: String
-    , gopt_textwidth :: Int     -- "fill" column (width of action label in characters)
-    , gopt_scriptwords :: Int   -- number of words from script to print
+    , gopt_textwidth :: Int      -- "fill" column (width of action label in characters)
+    , gopt_scriptwords :: Int    -- number of words from script to print
+    , gopt_swimlanes :: [String] -- list of agents for swimlanes, so order can be set on cmd line
 }
 
 defGraphOptions =  GOpt {
@@ -21,6 +22,7 @@ defGraphOptions =  GOpt {
                    , gopt_color = [] 
                    , gopt_textwidth = 20
                    , gopt_scriptwords = 10
+                   , gopt_swimlanes = []
 }
 
 optGraphType :: (Reader GraphOptions) GraphType
@@ -29,3 +31,5 @@ optGraphType = ask >>= (\gopts -> return $ gopt_graphtype gopts)
 optPruneDepth :: (Reader GraphOptions) Int
 optPruneDepth = ask >>= (\gopts -> return $ gopt_prunedepth gopts)
 
+optSwimlaneHeadings :: (Reader GraphOptions) [String]
+optSwimlaneHeadings = ask >>= (\gopts -> return $ gopt_swimlanes gopts)

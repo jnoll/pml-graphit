@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 -- convert PML to PlantUML Activity Diagram
 module Formal.PML.PrintUML (printUMLProcess, printUMLPRIM) where
-import Formal.PML.GraphOptions (GraphType(..), GraphOptions(..), defGraphOptions, optGraphType, optPruneDepth)
+import Formal.PML.GraphOptions (GraphType(..), GraphOptions(..), defGraphOptions, optGraphType, optPruneDepth, optSwimlaneHeadings)
 import Formal.PML.PrintBasic 
 import Control.Monad.Reader (Reader(..), ask)
 import Formal.PML.AbsPML
@@ -14,9 +14,11 @@ import Text.Pandoc.Shared (trim) -- overkill, but Pandoc is included anyway
 printPUML :: PRIM -> [PRIM] -> [String] -> (Reader GraphOptions) String
 printPUML root children body = do
   t <- optGraphType
-  let ags = findFirstAgentsPRIMs children
+  cols <- optSwimlaneHeadings
+  let ags = if null cols then findFirstAgentsPRIMs children else cols
+      swimlanes = if null cols then swimlanesPRIMs t ags children else printSwimLanes cols 
   return $ intercalate "\n" $ ["@startuml", mkTitle root] 
-                               ++ (swimlanesPRIMs t children) -- print ALL swimlanes at top so we see all agents
+                               ++ (swimlanes) -- print ALL swimlanes at top so we see all agents
                                ++ [printSwimlane $ if null ags then "(none)" else head ags, "start"] ++ body ++ ["end", "@enduml"]
 
 
@@ -38,14 +40,14 @@ printUMLPRIM' p ps = printPRIM 0 p >>= printPUML p ps
 
 
 -- Print all swimlanes
-swimlanesPRIMs :: GraphType -> [PRIM] -> [String]
-swimlanesPRIMs Swimlanes ps = let agents = findFirstAgentsPRIMs ps in
+swimlanesPRIMs :: GraphType -> [String] -> [PRIM] -> [String]
+swimlanesPRIMs Swimlanes agents ps =
                               if null agents then [printSwimlane "(none)"]
                               else let freqs = sortBy (\(_,f) (_,f') -> compare f f') $ map (\x->(head x, length x)) . group . sort $ agents
                                        rlanes = take (quot (length freqs) 2) freqs
                                        llanes = reverse $ drop (quot (length freqs) 2) freqs
-                                   in map (\(s, _) -> printSwimlane s) (rlanes ++ llanes)
-swimlanesPRIMs _ _ = [""]
+                                   in printSwimLanes $ map (\(s, _) -> s) $ (rlanes ++ llanes)
+swimlanesPRIMs _ _ _ = [""]
 
 -- This is necessary to get the control flow construct in the right swimlane.
 swimlanePRIMs :: GraphType -> [PRIM] -> String
@@ -57,6 +59,9 @@ swimlaneSPECs :: GraphType -> [SPEC] -> String
 swimlaneSPECs Swimlanes ss = let as = findAgentsSPECs ss in 
                              if length as > 0 then printSwimlane (head as) else printSwimlane "(none)"
 swimlaneSPECs _ _ = ""
+
+printSwimLanes :: [String] -> [String]
+printSwimLanes ss = map printSwimlane ss
 
 printSwimlane :: String -> String
 printSwimlane s = "|" ++ s ++ "|"
@@ -94,9 +99,9 @@ expandDepth opts n cur = if shouldExpand opts n then 0 else cur + 1
 
 printPRIM :: Int -> PRIM -> (Reader GraphOptions) [String]
 printPRIM depth p@(PrimSeq  n ps) = ask >>= (\opts -> (return $ expandDepth opts n depth)) >>= (\depth' -> printPRIMs depth'  "" ps >>= (\ss -> printPRIM' depth' "\n" "\n" n ss p))
-printPRIM depth p@(PrimSeln n ps) = ask >>= (\opts -> (return $ expandDepth opts n depth)) >>= (\depth' -> printSelect depth' ps >>= (\ss -> printPRIM' depth' "if (select?) then"  "endif" n ss p))
+printPRIM depth p@(PrimSeln n ps) = ask >>= (\opts -> (return $ expandDepth opts n depth)) >>= (\depth' -> printSelect depth' ps >>= (\ss -> printPRIM' depth' "if (do) then (either)"  "endif" n ss p))
 printPRIM depth p@(PrimBr   n ps) = ask >>= (\opts -> (return $ expandDepth opts n depth)) >>= (\depth' -> printPRIMs  depth' "fork again" ps >>= (\ss -> printPRIM' depth' "fork" "end fork" n ss p))
-printPRIM depth p@(PrimIter n ps) = ask >>= (\opts -> (return $ expandDepth opts n depth)) >>= (\depth' -> printPRIMs  depth' "" ps >>= (\ss -> printPRIM' depth' "repeat"  "repeat while ()" n ss p))
+printPRIM depth p@(PrimIter n ps) = ask >>= (\opts -> (return $ expandDepth opts n depth)) >>= (\depth' -> printPRIMs  depth' "" ps >>= (\ss -> printPRIM' depth' "repeat"  "repeat while (again?) is (yes)" n ss p))
 printPRIM depth p@(PrimTask n ps) = ask >>= (\opts -> (return $ expandDepth opts n depth)) >>= (\depth' -> printPRIMs  depth' "split again" ps >>= (\ss -> printPRIM' depth' "split" "end split" n ss p))
 printPRIM depth p@(PrimAct id@(ID n) act_t spcs) = 
     ask >>= (\opt -> if gopt_prunedepth opt > 0 then
@@ -158,8 +163,8 @@ printSelect :: Int -> [PRIM] -> (Reader GraphOptions) [String]
 printSelect _ [] = return []
 printSelect depth (p:r) 
   | length r == 0 = printPRIM depth p 
-  | length r == 1 = sequence [printPRIM depth p, printSelect depth r] >>= (\ss -> return $ intercalate ["else"] ss) 
-  | otherwise = sequence [printPRIM depth p, printSelect depth r] >>= (\ss -> return $ intercalate ["elseif (select?) then"] ss) 
+  | length r == 1 = sequence [printPRIM depth p, printSelect depth r] >>= (\ss -> return $ intercalate ["else (or)"] ss) 
+  | otherwise = sequence [printPRIM depth p, printSelect depth r] >>= (\ss -> return $ intercalate ["elseif () then (or)"] ss) 
 
 printPartition :: GraphOptions ->  OPTNM -> String
 printPartition _ OpNmNull =  ""

@@ -25,6 +25,7 @@ import System.IO (stdin, hGetContents)
 
 data Options = Options {
       opt_agents :: Bool
+    , opt_columns :: [String]   -- list of agents for "swimlane" column headings
     , opt_requires :: Bool
     , opt_provides :: Bool
     , opt_dot :: Bool
@@ -46,6 +47,7 @@ printPML' opts p =
                   else if opt_dot opts then defGraphOptions { gopt_graphtype = Dataflow } 
                   else let color = opt_color opts 
                        in defGraphOptions { gopt_graphtype = if (opt_swimlanes opts) then Swimlanes else Partitions
+                                          , gopt_swimlanes = opt_columns opts
                                           , gopt_color = color
                                           , gopt_prunedepth = opt_depth opts
                                           , gopt_expand = opt_expand opts
@@ -84,6 +86,7 @@ run opts =
 defaultOptions :: Options
 defaultOptions = Options {
             opt_agents    = False &= typ "Boolean"            &= help "output list of agents"                  &= name "agents"
+          , opt_columns   = []    &= typ "String"             &= help "list of swimlane headings"              &= name "headings"
           , opt_requires  = False &= typ "Boolean"            &= help "output list of required resources"      &= name "requires"
           , opt_provides  = False &= typ "Boolean"            &= help "output list of provided resources"      &= name "provides"
           , opt_dot       = False &= typ "Boolean"            &= help "output dot (graphviz) digraph"          &= name "dot"
