@@ -141,33 +141,32 @@ printScript ((SpecScript (STRING s)):ss) = init $ tail s
 printScript (_:ss) = printScript ss 
 
 
--- XXXjn this assumes only want first name; suitable for swimlanes
--- based on agent name, but not much else.
 printName :: EXPR -> [String]
 printName (DisjExpr l r) = (printName l) ++ (printName r)
 printName (ConjExpr l r) = (printName l) ++ (printName r)
 printName (Str s)        = [printSTRING s]
-printName (RelEq l _)    = [printVal l]
-printName (RelNe l _)    = [printVal l]
-printName (RelLt l _)    = [printVal l]
-printName (RelGt l _)    = [printVal l]
-printName (RelLe l _)    = [printVal l]
-printName (RelGe l _)    = [printVal l]
-printName (RelVeq l _)   = [printVar l]
-printName (RelVne l _)   = [printVar l]
+printName (RelEq l r)    = [printVal l] ++ [printVal r]
+printName (RelNe l r)    = [printVal l] ++ [printVal r]
+printName (RelLt l r)    = [printVal l] ++ [printVal r]
+printName (RelGt l r)    = [printVal l] ++ [printVal r]
+printName (RelLe l r)    = [printVal l] ++ [printVal r]
+printName (RelGe l r)    = [printVal l] ++ [printVal r]
+printName (RelVeq l r)   = [printVar l] ++ [printVar r]
+printName (RelVne l r)   = [printVar l] ++ [printVar r]
 
 printName (PrimVar v) = [printVar v]
-printName (PrimAttr _) = [""]
-printName (PrimNot _) = [""]
+printName (PrimAttr (Attr v i)) = [printVar v ++ "|" ++ printID i]
+printName (PrimNot e) = printName e
 
 printVar :: VAREXPR -> String
 printVar (VarId i) = printID i
-printVar (VarPar _) = ""
-printVar (VarMore _ _) = ""
+printVar (VarPar i) = "printVar.VarPar: " ++ printID i
+printVar (VarMore qual expr) = printVar expr ++ "|(" ++ printID qual ++ ")" -- (qualifier) resource
+
+printAttr :: ATTREXPR -> String
+printAttr (Attr vexp i) = printVar vexp ++ "|" ++ printID i
 
 printVal :: VALEXPR -> String
-printVal (ValAttr _) = ""
-printVal (ValString s) = printSTRING s
+printVal (ValAttr a) = printAttr a
+printVal (ValString s) = "STRING|" ++ printSTRING s
 printVal (ValNum n) = show n
-
-

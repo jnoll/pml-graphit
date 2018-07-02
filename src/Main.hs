@@ -94,7 +94,7 @@ defaultOptions = Options {
           , opt_depth     = 0     &= typ "Int"                &= help "depth at which to prune subtree"        &= name "depth"
           , opt_expand    = []    &= typ "Name"               &= help "expand this action beyond prune depth"  &= name "expand"
           , opt_files     = def   &= typFile &= args
-          , opt_subtree   = def   &= typ "subtree"            &= help "select subtree"                         &= name "subtree"
+          , opt_subtree   = def   &= typ "subtree"            &= help "select subtree (whole block or single action)" &= name "subtree"
           , opt_swimlanes = False &= typ "Boolean"            &= help "plot in swimlanes"                      &= name "swim"
           , opt_width     = 10    &= typ "Int"                &= help "text width for labels/descriptions"     &= name "width"
           , opt_words     = 10    &= typ "Int"                &= help "number of words for descriptions"       &= name "Words"

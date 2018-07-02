@@ -117,7 +117,7 @@ printAct opt id spcs term = if (gopt_graphtype opt) == Swimlanes
                             else printActPlain (gopt_color opt) (gopt_textwidth opt) (gopt_scriptwords opt) id spcs term
 
 printActPlain :: [(String, String)] -> Int -> Int -> ID -> [SPEC] -> String -> [String]
-printActPlain c w wds id spcs term = [(printColor c (printID id)) ++  printActName w wds id (printScript spcs) term]
+printActPlain c w wds id spcs term = [formatString' w ((printColor c (printID id)) ++  printActName w wds id (printScript spcs) term)]
               
 printActSwimlane :: [(String, String)] -> Int -> Int -> ID -> [SPEC] -> String -> [String]
 printActSwimlane c w wds id spcs term =
