@@ -1,22 +1,26 @@
 process t {
     action a {
-	requires { r }
-	provides { s.attr }
+	requires { a_r }
+	provides { a_s.anAttr }
     }
     action b {
-	requires { s.attr }
-	provides { s.attr == "string value" }
+	requires { b_s.anAttr }
+	provides { b_s.anAttr == "string value" }
     }
     action b2 {
-	requires { s.attr }
-	provides { s.attr <= "string value 2" }
+	requires { b2_s.anAttr >= 1}
+	provides { b2_s.anAttr <= "string value 2" }
     }
     action c {
-	requires { t.attr == s.attr }
-	provides { t.attr_lt < s.attr_gt }
+	requires { c_t.anAttr == s.anAttr }
+	provides { c_t.anAttr_lt < s.anAttr_gt }
     }
     action d {
-	requires { t != s }
-	provides { t == s }
+	requires { d_t != s }
+	provides { d_t == s }
+    }
+    action e {
+	requires { e_u || v }
+	provides { e_v && r }
     }
 }

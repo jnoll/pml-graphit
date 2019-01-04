@@ -121,7 +121,7 @@ printAgent (s@(SpecAgent e):ss) = printAgent' s ++ printAgent ss
 printAgent (_:ss) = printAgent ss 
 
 printAgent' :: SPEC -> [String]
-printAgent' (SpecAgent e) = printName e
+printAgent' (SpecAgent e) = printExpr e
 printAgent' _ = ["none"]
 
 printResource :: [SPEC] -> [String]
@@ -131,8 +131,8 @@ printResource (s@(SpecProv e):ss) = printResource' s ++ printResource ss
 printResource (_:ss) = printResource ss 
 
 printResource' :: SPEC -> [String]
-printResource' (SpecReqs e) = printName e
-printResource' (SpecProv e) = printName e
+printResource' (SpecReqs e) = printExpr e
+printResource' (SpecProv e) = printExpr e
 printResource' _ = ["none"]
 
 printScript :: [SPEC] -> String
@@ -141,22 +141,23 @@ printScript ((SpecScript (STRING s)):ss) = init $ tail s
 printScript (_:ss) = printScript ss 
 
 
-printName :: EXPR -> [String]
-printName (DisjExpr l r) = (printName l) ++ (printName r)
-printName (ConjExpr l r) = (printName l) ++ (printName r)
-printName (Str s)        = [printSTRING s]
-printName (RelEq l r)    = [printVal l] ++ [printVal r]
-printName (RelNe l r)    = [printVal l] ++ [printVal r]
-printName (RelLt l r)    = [printVal l] ++ [printVal r]
-printName (RelGt l r)    = [printVal l] ++ [printVal r]
-printName (RelLe l r)    = [printVal l] ++ [printVal r]
-printName (RelGe l r)    = [printVal l] ++ [printVal r]
-printName (RelVeq l r)   = [printVar l] ++ [printVar r]
-printName (RelVne l r)   = [printVar l] ++ [printVar r]
+printExpr :: EXPR -> [String]
 
-printName (PrimVar v) = [printVar v]
-printName (PrimAttr (Attr v i)) = [printVar v ++ "|" ++ printID i]
-printName (PrimNot e) = printName e
+printExpr (DisjExpr l r) = [(concat $ printExpr l) ++ " or " ++ (concat $ printExpr r)] -- XXX s.b. "lhs or rhs"
+printExpr (ConjExpr l r) = (printExpr l) ++ (printExpr r)
+printExpr (Str s)        = [printSTRING s ++ " exists"]
+printExpr (RelEq l r)    = [printVal l ++ " is " ++ printVal r]
+printExpr (RelNe l r)    = [printVal l ++ " is not " ++ printVal r]
+printExpr (RelLt l r)    = [printVal l ++ " is less than " ++ printVal r]
+printExpr (RelGt l r)    = [printVal l ++ " is greater than " ++ printVal r]
+printExpr (RelLe l r)    = [printVal l ++ " is less than or equal to " ++ printVal r]
+printExpr (RelGe l r)    = [printVal l ++ " is greater than or equal to " ++ printVal r]
+printExpr (RelVeq l r)   = [printVar l ++ " is equal to " ++ printVar r]
+printExpr (RelVne l r)   = [printVar l ++ " is not equal to " ++ printVar r]
+
+printExpr (PrimVar v) = [printVar v]
+printExpr (PrimAttr (Attr v i)) = [printVar v ++ " " ++ printID i] -- assumes attr is a past-tense verb
+printExpr (PrimNot e) = printExpr e
 
 printVar :: VAREXPR -> String
 printVar (VarId i) = printID i
@@ -164,9 +165,9 @@ printVar (VarPar i) = "printVar.VarPar: " ++ printID i
 printVar (VarMore qual expr) = printVar expr ++ "|(" ++ printID qual ++ ")" -- (qualifier) resource
 
 printAttr :: ATTREXPR -> String
-printAttr (Attr vexp i) = printVar vexp ++ "|" ++ printID i
+printAttr (Attr vexp i) = printID i ++ " of " ++ printVar vexp 
 
 printVal :: VALEXPR -> String
 printVal (ValAttr a) = printAttr a
-printVal (ValString s) = "STRING|" ++ printSTRING s
+printVal (ValString s) = printSTRING s
 printVal (ValNum n) = show n

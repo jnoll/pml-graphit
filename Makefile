@@ -123,9 +123,9 @@ test-agents:
 
 test-requires:
 	@echo "test_control_flow.pml + requires: "
-	@stack exec pml-graphit -- --requires test_control_flow.pml 
+	@stack exec pml-graphit -- --requires test_resources.pml 
 
 test-provides:
 	@echo "test_control_flow.pml + provides: "
-	@stack exec pml-graphit -- --provides test_control_flow.pml 
+	@stack exec pml-graphit -- --provides test_resources.pml 
 
