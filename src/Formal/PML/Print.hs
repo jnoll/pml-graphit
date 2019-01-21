@@ -37,13 +37,13 @@ printUML :: GraphOptions -> PROCESS -> String
 printUML gopts p = runReader (printUMLProcess p) gopts
 
 printAgents :: PROCESS -> [String]
-printAgents p@(Process id ps) = sort $ nub $   findAgentsPRIMs ps
+printAgents p@(Process id ps) = sort $ nub $   printAgentsPRIMs ps
 
 printRequires :: PROCESS -> [String]
-printRequires p@(Process id ps) = sort $ nub $ findRequiresPRIMs ps
+printRequires p@(Process id ps) = sort $ nub $ printRequiresPRIMs ps
 
 printProvides :: PROCESS -> [String]
-printProvides p@(Process id ps) = sort $ nub $ findProvidesPRIMs ps
+printProvides p@(Process id ps) = sort $ nub $ printProvidesPRIMs ps
 
 printDot :: GraphOptions -> PROCESS -> String
 printDot gopts p = intercalate "\n" $ runReader (printDotProcess p) gopts 

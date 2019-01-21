@@ -15,7 +15,7 @@ printPUML :: PRIM -> [PRIM] -> [String] -> (Reader GraphOptions) String
 printPUML root children body = do
   t <- optGraphType
   cols <- optSwimlaneHeadings
-  let ags = if null cols then findFirstAgentsPRIMs children else cols
+  let ags = if null cols then printFirstAgentsPRIMs children else cols -- XXX sb printFirstAgentsPRIMs
       swimlanes = if null cols then swimlanesPRIMs t ags children else printSwimLanes cols 
   return $ intercalate "\n" $ ["@startuml", mkTitle root] 
                                ++ (swimlanes) -- print ALL swimlanes at top so we see all agents
@@ -51,12 +51,12 @@ swimlanesPRIMs _ _ _ = [""]
 
 -- This is necessary to get the control flow construct in the right swimlane.
 swimlanePRIMs :: GraphType -> [PRIM] -> String
-swimlanePRIMs Swimlanes ps = let as = findAgentsPRIMs ps in 
+swimlanePRIMs Swimlanes ps = let as = printAgentsPRIMs ps in 
                              if length as > 0 then printSwimlane (head as) else printSwimlane "(none)"
 swimlanePRIMs _ _ = ""
 
 swimlaneSPECs :: GraphType -> [SPEC] -> String
-swimlaneSPECs Swimlanes ss = let as = findAgentsSPECs ss in 
+swimlaneSPECs Swimlanes ss = let as = printAgentsSPECs ss in 
                              if length as > 0 then printSwimlane (head as) else printSwimlane "(none)"
 swimlaneSPECs _ _ = ""
 
@@ -121,7 +121,7 @@ printActPlain c w wds id spcs term = [formatString' w ((printColor c (printID id
               
 printActSwimlane :: [(String, String)] -> Int -> Int -> ID -> [SPEC] -> String -> [String]
 printActSwimlane c w wds id spcs term =
-    let as = findAgentsSPECs spcs
+    let as = printAgentsSPECs spcs
         a = if length as > 0 then head as else "(none)"
     in if length as > 1         -- add a UML note with other agent names.
        then [printSwimlane a, (printColor c $ printID id) ++ printActName w wds id (printScript spcs) "", "==agents==", 

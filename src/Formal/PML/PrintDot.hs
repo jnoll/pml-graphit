@@ -55,10 +55,10 @@ printAct :: GraphOptions -> ID -> [SPEC] -> [String]
 printAct opt id spcs = [printAct' opt id spcs] ++ (printRequires opt id spcs) ++ (printProvides opt id spcs)
 
 printRequires  :: GraphOptions -> ID -> [SPEC] -> [String]
-printRequires opt id spcs = map (\r -> if length r > 0 then  r ++ " -> " ++ (printID id) ++ " ;" else []) $ findProvidesSPECs spcs 
+printRequires opt id spcs = map (\r -> if length r > 0 then  r ++ " -> " ++ (printID id) ++ " ;" else []) $ printProvidesSPECs spcs 
 
 printProvides  :: GraphOptions -> ID -> [SPEC] -> [String]
-printProvides opt id spcs = map (\r -> if length r > 0 then printf "%s -> %s;" (printID id) r else []) $ findProvidesSPECs spcs 
+printProvides opt id spcs = map (\r -> if length r > 0 then printf "%s -> %s;" (printID id) r else []) $ printProvidesSPECs spcs 
 
 printAct' :: GraphOptions -> ID -> [SPEC] -> String
 --printAct' opt id spcs = printf "[label=\"%s - %s\"]" (printID id) (unwords $ take 5 $ words $ printScript spcs)

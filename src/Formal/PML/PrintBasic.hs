@@ -1,10 +1,11 @@
 {- Print basic elements from PML, as simple strings without formatting
 that can be used by output-specific print modules.-} 
 
-module Formal.PML.PrintBasic (findActionsPRIMs, findAgentsPRIMs, findFirstAgentsPRIMs, findAgentsSPECs, findRequiresPRIMs, findRequiresSPECs, findProvidesPRIMs, findProvidesSPECs, printID, printSTRING, printTitle, printOPTNM, printScript) where 
+module Formal.PML.PrintBasic (findActionsPRIMs, findAgentsPRIMs, findFirstAgentsPRIMs, findAgentsSPECs, findRequiresPRIMs, findRequiresSPECs, findProvidesPRIMs, findProvidesSPECs, printAgentsPRIMs, printFirstAgentsPRIMs, printAgentsSPECs, printRequiresPRIMs, printRequiresSPECs, printProvidesPRIMs, printProvidesSPECs, printID, printSTRING, printTitle, printOPTNM, printScript) where 
 import Control.Monad.Reader (Reader(..), ask)
 import Data.List (intercalate, intersperse, nub, sort)
 import Formal.PML.AbsPML
+
 
 findActionsPRIMs :: [PRIM] -> [(String, String, String, [String])]
 findActionsPRIMs [] = []
@@ -16,24 +17,51 @@ findActionsPRIM (PrimSeln _ ps) = findActionsPRIMs ps
 findActionsPRIM (PrimBr   _ ps) = findActionsPRIMs ps
 findActionsPRIM (PrimIter _ ps) = findActionsPRIMs ps
 findActionsPRIM (PrimTask _ ps) = findActionsPRIMs ps
-findActionsPRIM (PrimAct  id t spcs) = [(printID id, printOPTYP t, printScript spcs, findAgentsSPECs spcs)]
+findActionsPRIM (PrimAct  id t spcs) = [(printID id, printOPTYP t, printScript spcs, concat $ map flattenExpr $ findAgentsSPECs spcs)]
 
 
+printFirstAgentsPRIMs :: [PRIM] -> [String]
+printFirstAgentsPRIMs [] = []
+printFirstAgentsPRIMs ps = concat $ map flattenExpr $ findFirstAgentsPRIMs ps
+
+printAgentsPRIMs :: [PRIM] -> [String]
+printAgentsPRIMs [] = []
+printAgentsPRIMs ps = concat $ map flattenExpr $ findAgentsPRIMs ps
+
+printAgentsSPECs :: [SPEC] -> [String]
+printAgentsSPECs [] = []
+printAgentsSPECs ps = concat $ map flattenExpr $ findAgentsSPECs ps
+
+printRequiresPRIMs :: [PRIM] -> [String]
+printRequiresPRIMs [] = []
+printRequiresPRIMs ps = concat $ map flattenExpr $ findRequiresPRIMs ps
+
+printRequiresSPECs :: [SPEC] -> [String]
+printRequiresSPECs [] = []
+printRequiresSPECs ps = concat $ map flattenExpr $ findRequiresSPECs ps
+
+printProvidesPRIMs :: [PRIM] -> [String]
+printProvidesPRIMs [] = []
+printProvidesPRIMs ps = concat $ map flattenExpr $ findProvidesPRIMs ps
+
+printProvidesSPECs :: [SPEC] -> [String]
+printProvidesSPECs [] = []
+printProvidesSPECs ps = concat $ map flattenExpr $ findProvidesSPECs ps
 
 -- Get agent name(s) from expression in 'agent' field: 
 -- agent { Doctor && Nurse } -> [Doctor, Nurse]
 -- agent { Dev.experience > 5 || QA } -> [Dev, QA]
-findAgentsPRIMs :: [PRIM] -> [String]
+findAgentsPRIMs :: [PRIM] -> [EXPR]
 findAgentsPRIMs = findAgentsPRIMs' False
 
-findFirstAgentsPRIMs :: [PRIM] -> [String]
+findFirstAgentsPRIMs :: [PRIM] -> [EXPR]
 findFirstAgentsPRIMs = findAgentsPRIMs' True 
 
-findAgentsPRIMs' :: Bool -> [PRIM] -> [String]
+findAgentsPRIMs' :: Bool -> [PRIM] -> [EXPR]
 findAgentsPRIMs' _ [] = []
 findAgentsPRIMs' firstOnly (p:ps) = (findAgentsPRIM firstOnly  p) ++ (findAgentsPRIMs' firstOnly ps)
 
-findAgentsPRIM :: Bool -> PRIM -> [String]
+findAgentsPRIM :: Bool -> PRIM -> [EXPR]
 findAgentsPRIM firstOnly (PrimSeq  _ ps) = findAgentsPRIMs' firstOnly  ps
 findAgentsPRIM firstOnly (PrimSeln _ ps) = findAgentsPRIMs' firstOnly  ps
 findAgentsPRIM firstOnly (PrimBr   _ ps) = findAgentsPRIMs' firstOnly  ps
@@ -41,20 +69,27 @@ findAgentsPRIM firstOnly (PrimIter _ ps) = findAgentsPRIMs' firstOnly  ps
 findAgentsPRIM firstOnly (PrimTask _ ps) = findAgentsPRIMs' firstOnly  ps
 findAgentsPRIM firstOnly (PrimAct  _ _ spcs) = findAgentsSPECs' firstOnly spcs 
 
-findAgentsSPECs :: [SPEC] -> [String]
+findAgentsSPECs :: [SPEC] -> [EXPR]
 findAgentsSPECs = findAgentsSPECs' False
 
-findAgentsSPECs' :: Bool -> [SPEC] -> [String]
+findAgentsSPECs' :: Bool -> [SPEC] -> [EXPR]
 findAgentsSPECs' _ [] = []
-findAgentsSPECs' firstOnly  (s@(SpecAgent _):ss) = if firstOnly then [head $ printAgent' s]  else (printAgent' s) ++ findAgentsSPECs' firstOnly ss
+findAgentsSPECs' firstOnly  (s@(SpecAgent e):ss) = if firstOnly then [findFirstExpr e]  else e:(findAgentsSPECs' firstOnly ss)
 findAgentsSPECs' firstOnly (_:ss) = findAgentsSPECs' firstOnly ss
 
--- Get resource name(s) from expression in 'resource' field. 
-findRequiresPRIMs :: [PRIM] -> [String]
+--findAgent :: SPEC -> EXPR
+--findAgent (SpecAgent e) = e
+
+findFirstExpr :: EXPR -> EXPR
+findFirstExpr (DisjExpr l r) = findFirstExpr l
+findFirstExpr (ConjExpr l r) = findFirstExpr l
+findFirstExpr e              = e
+
+findRequiresPRIMs :: [PRIM] -> [EXPR]
 findRequiresPRIMs [] = []
 findRequiresPRIMs (p:ps) = (findRequiresPRIM  p) ++ (findRequiresPRIMs  ps)
 
-findRequiresPRIM :: PRIM -> [String]
+findRequiresPRIM :: PRIM -> [EXPR]
 findRequiresPRIM (PrimSeq  _ ps) = findRequiresPRIMs ps
 findRequiresPRIM (PrimSeln _ ps) = findRequiresPRIMs ps
 findRequiresPRIM (PrimBr   _ ps) = findRequiresPRIMs ps
@@ -62,18 +97,17 @@ findRequiresPRIM (PrimIter _ ps) = findRequiresPRIMs ps
 findRequiresPRIM (PrimTask _ ps) = findRequiresPRIMs ps
 findRequiresPRIM (PrimAct  _ _ spcs) = findRequiresSPECs spcs
 
-
-findRequiresSPECs :: [SPEC] -> [String]
---findRequiresSPECs  = printAgent
+findRequiresSPECs :: [SPEC] -> [EXPR]
 findRequiresSPECs  [] = []
-findRequiresSPECs  (s@(SpecReqs _):ss) = (printResource' s) ++ findRequiresSPECs ss
+findRequiresSPECs  ((SpecReqs e):ss) = e:(findRequiresSPECs ss)
 findRequiresSPECs  (_:ss) = findRequiresSPECs ss
 
-findProvidesPRIMs :: [PRIM] -> [String]
+
+findProvidesPRIMs :: [PRIM] -> [EXPR]
 findProvidesPRIMs [] = []
 findProvidesPRIMs (p:ps) = (findProvidesPRIM  p) ++ (findProvidesPRIMs  ps)
 
-findProvidesPRIM :: PRIM -> [String]
+findProvidesPRIM :: PRIM -> [EXPR]
 findProvidesPRIM (PrimSeq  _ ps) = findProvidesPRIMs ps
 findProvidesPRIM (PrimSeln _ ps) = findProvidesPRIMs ps
 findProvidesPRIM (PrimBr   _ ps) = findProvidesPRIMs ps
@@ -81,12 +115,16 @@ findProvidesPRIM (PrimIter _ ps) = findProvidesPRIMs ps
 findProvidesPRIM (PrimTask _ ps) = findProvidesPRIMs ps
 findProvidesPRIM (PrimAct  _ _ spcs) = findProvidesSPECs spcs
 
-
-findProvidesSPECs :: [SPEC] -> [String]
+findProvidesSPECs :: [SPEC] -> [EXPR]
 findProvidesSPECs  [] = []
-findProvidesSPECs  (s@(SpecProv _):ss) = (printResource' s) ++ findProvidesSPECs ss
+findProvidesSPECs  (s@(SpecProv e):ss) = e:(findProvidesSPECs ss)
 findProvidesSPECs  (_:ss) = findProvidesSPECs ss
 
+findResource :: [SPEC] -> [EXPR]
+findResource [] = []
+findResource (s@(SpecReqs e):ss) = e:(findResource ss)
+findResource (s@(SpecProv e):ss) = e:(findResource ss)
+findResource (_:ss) = findResource ss 
 
 printOPTNM :: OPTNM -> String
 printOPTNM OpNmNull = "(none)"
