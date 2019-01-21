@@ -18,17 +18,17 @@ test-happyswim:
 	@plantuml test.puml
 	@eog test.png
 test-swim:
-	@echo "swimlanes2: Foo: 4, Bar noted: 3, Baz noted: 3"
+	@echo "swimlanes: Foo: 4, Bar noted: 3, Baz noted: 3"
 	stack exec pml-graphit -- --swim test_swimlanes2.pml > test.puml
 	plantuml test.puml
 	@eog test.png
 test-swim2:
-	@echo "swimlanes3: Foo: 1"
+	@echo "swimlanes2 (and/or): Foo: 1"
 	@stack exec pml-graphit -- --swim test_swimlanes3.pml > test.puml
 	@plantuml test.puml
 	@eog test.png
 test-swim-noagents:
-	@echo "nogents: foo, bar in none"
+	@echo "swimlanes nogents: foo, bar in none"
 	@stack exec pml-graphit -- --swim test_noagents.pml > test.puml
 	@plantuml test.puml
 	@eog test.png
