@@ -1,7 +1,7 @@
 {- Print basic elements from PML, as simple strings without formatting
 that can be used by output-specific print modules.-} 
 
-module Formal.PML.PrintBasic (findActionsPRIMs, findAgentsPRIMs, findFirstAgentsPRIMs, findAgentsSPECs, findRequiresPRIMs, findRequiresSPECs, findProvidesPRIMs, findProvidesSPECs, printID, printTitle, printOPTNM, printScript) where 
+module Formal.PML.PrintBasic (findActionsPRIMs, findAgentsPRIMs, findFirstAgentsPRIMs, findAgentsSPECs, findRequiresPRIMs, findRequiresSPECs, findProvidesPRIMs, findProvidesSPECs, printID, printSTRING, printTitle, printOPTNM, printScript) where 
 import Control.Monad.Reader (Reader(..), ask)
 import Data.List (intercalate, intersperse, nub, sort)
 import Formal.PML.AbsPML
