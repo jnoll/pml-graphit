@@ -53,4 +53,9 @@ process test_control_flow {
 	    action nested_action_at_level_2 {}
 	}
     }
+    sequence Sub_process {
+	action normal {}
+	action sub_process subprocess {}
+	action normal {}
+    }
 }

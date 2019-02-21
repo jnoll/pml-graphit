@@ -104,12 +104,13 @@ printPRIM depth p@(PrimBr   n ps) = ask >>= (\opts -> (return $ expandDepth opts
 printPRIM depth p@(PrimIter n ps) = ask >>= (\opts -> (return $ expandDepth opts n depth)) >>= (\depth' -> printPRIMs  depth' "" ps >>= (\ss -> printPRIM' depth' "repeat"  "repeat while (again?) is (yes)" n ss p))
 printPRIM depth p@(PrimTask n ps) = ask >>= (\opts -> (return $ expandDepth opts n depth)) >>= (\depth' -> printPRIMs  depth' "split again" ps >>= (\ss -> printPRIM' depth' "split" "end split" n ss p))
 printPRIM depth p@(PrimAct id@(ID n) act_t spcs) = 
-    ask >>= (\opt -> if gopt_prunedepth opt > 0 then
+    ask >>= (\opt -> let term = if act_t == OptSubProc then "}" else ";" 
+                           in if gopt_prunedepth opt > 0 then
                          if depth <= gopt_prunedepth opt then 
-                             return $ printAct opt id spcs ";"
-                         else if gopt_expand opt == n then return $ printAct opt id spcs ";"
+                             return $ printAct opt id spcs term
+                         else if gopt_expand opt == n then return $ printAct opt id spcs term
                               else return [""]
-                     else return $ printAct opt id spcs ";")
+                     else return $ printAct opt id spcs term)
 
 printAct :: GraphOptions -> ID -> [SPEC] -> String -> [String]
 printAct opt id spcs term = if (gopt_graphtype opt) == Swimlanes 
