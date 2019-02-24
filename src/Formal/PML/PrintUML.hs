@@ -7,6 +7,7 @@ import Control.Monad.Reader (Reader(..), ask)
 import Formal.PML.AbsPML
 import Data.Char
 import Data.List (drop, find, group, intercalate, intersperse, nub, sort, sortBy, take, isPrefixOf)
+import Data.Maybe (isJust, fromJust)
 import Text.Pandoc (readMarkdown, writePlain, ReaderOptions(..), WriterOptions(..), def)
 import Text.Pandoc.Shared (trim) -- overkill, but Pandoc is included anyway
 
@@ -15,9 +16,10 @@ printPUML :: PRIM -> [PRIM] -> [String] -> (Reader GraphOptions) String
 printPUML root children body = do
   t <- optGraphType
   cols <- optSwimlaneHeadings
+  gopts <- ask
   let ags = if null cols then printFirstAgentsPRIMs children else cols -- XXX sb printFirstAgentsPRIMs
       swimlanes = if null cols then swimlanesPRIMs t ags children else printSwimLanes cols 
-  return $ intercalate "\n" $ ["@startuml", mkTitle root] 
+  return $ intercalate "\n" $ ["@startuml", mkTitle root (gopt_titleprefix gopts)] 
                                ++ (swimlanes) -- print ALL swimlanes at top so we see all agents
                                ++ [printSwimlane $ if null ags then "(none)" else head ags, "start"] ++ body ++ ["end", "@enduml"]
 
@@ -70,8 +72,8 @@ printSwimlane s = "|" ++ s ++ "|"
 
 
 
-mkTitle :: PRIM -> String
-mkTitle p = "title //" ++ (ustosp $ printTitle p) ++ "//"
+mkTitle :: PRIM -> Maybe String -> String
+mkTitle p prefix = "title //" ++ (if isJust prefix then (fromJust prefix) ++ ": " else "") ++ (ustosp $ printTitle p) ++ "//"
 
 ustosp :: String -> String
 ustosp = map (\c -> if c == '_' then ' ' else c)

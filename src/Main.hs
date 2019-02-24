@@ -35,6 +35,7 @@ data Options = Options {
     , opt_files :: [String]
     , opt_subtree ::  String
     , opt_swimlanes :: Bool
+    , opt_titleprefix :: Maybe String
     , opt_width :: Int
     , opt_words :: Int
 } deriving (Data, Typeable, Show)
@@ -52,6 +53,7 @@ printPML' opts p =
                                           , gopt_prunedepth = opt_depth opts
                                           , gopt_expand = opt_expand opts
                                           , gopt_textwidth = opt_width opts 
+                                          , gopt_titleprefix = opt_titleprefix opts
                                           , gopt_scriptwords = opt_words opts 
                                           }
     in printPML gopts p
@@ -96,6 +98,7 @@ defaultOptions = Options {
           , opt_files     = def   &= typFile &= args
           , opt_subtree   = def   &= typ "subtree"            &= help "select subtree (whole block or single action)" &= name "subtree"
           , opt_swimlanes = False &= typ "Boolean"            &= help "plot in swimlanes"                      &= name "swim"
+          , opt_titleprefix = Nothing &= typ "String"         &= help "prefix to prepend to diagram title"     &= name "prefix"
           , opt_width     = 10    &= typ "Int"                &= help "text width for labels/descriptions"     &= name "width"
           , opt_words     = 10    &= typ "Int"                &= help "number of words for descriptions"       &= name "Words"
           }

@@ -64,8 +64,13 @@ test-select2swim:
 	@plantuml test.puml
 	@eog test.png
 test-select3:
-	@echo "test_control_flow.pml + subtree root"
+	@echo "test_control_flow.pml + subtree "
 	@stack exec pml-graphit -- --subtree test_control_flow  test_control_flow.pml > test.puml
+	@plantuml test.puml
+	@eog test.png
+test-select4:
+	@echo "test_subtree.pml + subtree root"
+	@stack exec pml-graphit -- --subtree root  test_subtree.pml > test.puml
 	@plantuml test.puml
 	@eog test.png
 test-select3swim:
@@ -129,3 +134,8 @@ test-provides:
 	@echo "test_control_flow.pml + provides: "
 	@stack exec pml-graphit -- --provides test_resources.pml 
 
+test-titleprefix:
+	@echo "titleprefix"
+	@stack exec pml-graphit -- --prefix "Title Prefix Test" test_control_flow.pml > test.puml
+	@plantuml test.puml
+	@eog test.png
