@@ -6,14 +6,14 @@
 module Main where
 
 import Data.List (intercalate)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isNothing)
 
 import Formal.PML.AbsPML (PROCESS(..))
 import Formal.PML.ErrM
 import Formal.PML.Subtree (selectSubtree)
 import Formal.PML.Print 
 import Formal.PML.GraphOptions (GraphType(..), GraphOptions(..), defGraphOptions)
---import Formal.PML.PrintUML (GraphOptions(..), GraphType(..), defGraphOptions)
+import Formal.PML.PrintBasic (printID)
 
 import System.Console.CmdArgs
 import System.Environment (getArgs, getProgName)
@@ -70,7 +70,9 @@ runContents :: Options -> String -> IO ()
 runContents opt s = case parseContents s of
            Bad s    -> do putStrLn $ "error: " ++ s
 
-           Ok  tree -> showTree opt $ selectSubtree (opt_subtree opt) tree 
+           Ok  tree@(Process id _) -> let tree' = selectSubtree (opt_subtree opt) tree
+                                      in showTree opt { opt_titleprefix = if (isNothing $ opt_titleprefix opt) && (tree' /= tree) -- include process name in title
+                                                        then Just $ printID id else opt_titleprefix opt } tree'
 
 
 runFile :: Options -> FilePath -> IO ()

@@ -73,7 +73,7 @@ printSwimlane s = "|" ++ s ++ "|"
 
 
 mkTitle :: PRIM -> Maybe String -> String
-mkTitle p prefix = "title //" ++ (if isJust prefix then (fromJust prefix) ++ ": " else "") ++ (ustosp $ printTitle p) ++ "//"
+mkTitle p prefix = "title //" ++ (if isJust prefix then (ustosp $ fromJust prefix) ++ ": " else "") ++ (ustosp $ printTitle p) ++ "//"
 
 ustosp :: String -> String
 ustosp = map (\c -> if c == '_' then ' ' else c)
